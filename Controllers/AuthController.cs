@@ -32,8 +32,7 @@ namespace RawSuplementos.Api.Controllers
         // SOLO ADMIN
         // =========================
 
-        //[Authorize(Roles = "Admin")]
-        [AllowAnonymous]
+        [Authorize(Roles = "Admin")]
         [HttpPost("registrar")]
         public async Task<IActionResult> Registrar(
             RegistrarUsuarioDto dto)
