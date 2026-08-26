@@ -127,10 +127,8 @@ builder.Services.AddCors(options =>
         {
             policy
                 .WithOrigins(
-                    "http://localhost:5173"
-                // Cuando publiques React,
-                // agrega aquí la URL real:
-                // "https://raw-suplementos.vercel.app"
+                    "http://localhost:5173",
+                    "https://raw-suplementos.vercel.app"
                 )
                 .AllowAnyHeader()
                 .AllowAnyMethod();
