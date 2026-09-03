@@ -19,6 +19,18 @@ namespace RawSuplementos.Api.Controllers
             _context = context;
         }
 
+        private static (DateTime InicioHoyUtc, DateTime InicioMananaUtc, DateTime InicioCuatroDiasUtc)
+            ObtenerLimitesCobro()
+        {
+            var hoyCostaRica = FechaHelper.HoyCostaRica();
+
+            return (
+                FechaHelper.CostaRicaAUtc(hoyCostaRica),
+                FechaHelper.CostaRicaAUtc(hoyCostaRica.AddDays(1)),
+                FechaHelper.CostaRicaAUtc(hoyCostaRica.AddDays(4))
+            );
+        }
+
         // ==========================================
         // GET: api/cuentasporcobrar
         // LISTA GENERAL DE CLIENTES CON DEUDA
@@ -27,7 +39,8 @@ namespace RawSuplementos.Api.Controllers
         [HttpGet]
         public async Task<IActionResult> ObtenerCuentasPorCobrar()
         {
-            var hoy = FechaHelper.AhoraUtc();
+            var (inicioHoyUtc, inicioMananaUtc, _) =
+                ObtenerLimitesCobro();
 
             var clientes = await _context.Clientes
                 .AsNoTracking()
@@ -52,7 +65,7 @@ namespace RawSuplementos.Api.Controllers
                             (v.Estado == "Pendiente" ||
                              v.Estado == "Parcial") &&
                             v.FechaVencimiento.HasValue &&
-                            v.FechaVencimiento.Value.Date < hoy
+                            v.FechaVencimiento.Value < inicioHoyUtc
                         ),
 
                     VencenHoy = c.Ventas
@@ -60,7 +73,8 @@ namespace RawSuplementos.Api.Controllers
                             (v.Estado == "Pendiente" ||
                              v.Estado == "Parcial") &&
                             v.FechaVencimiento.HasValue &&
-                            v.FechaVencimiento.Value.Date == hoy
+                            v.FechaVencimiento.Value >= inicioHoyUtc &&
+                            v.FechaVencimiento.Value < inicioMananaUtc
                         ),
 
                     ProximoVencimiento = c.Ventas
@@ -85,9 +99,7 @@ namespace RawSuplementos.Api.Controllers
             return Ok(new
             {
                 totalPorCobrar,
-
                 cantidadClientes = clientes.Count,
-
                 clientes
             });
         }
@@ -101,7 +113,8 @@ namespace RawSuplementos.Api.Controllers
         public async Task<IActionResult> ObtenerCuentaCliente(
             int clienteId)
         {
-            var hoy = FechaHelper.AhoraUtc();
+            var (inicioHoyUtc, inicioMananaUtc, inicioCuatroDiasUtc) =
+                ObtenerLimitesCobro();
 
             var cliente = await _context.Clientes
                 .AsNoTracking()
@@ -162,35 +175,26 @@ namespace RawSuplementos.Api.Controllers
                     EstadoCobro =
                         !v.FechaVencimiento.HasValue
                             ? "SinFecha"
-
-                            : v.FechaVencimiento.Value.Date < hoy
+                            : v.FechaVencimiento.Value < inicioHoyUtc
                                 ? "Vencida"
-
-                                : v.FechaVencimiento.Value.Date == hoy
+                                : v.FechaVencimiento.Value < inicioMananaUtc
                                     ? "VenceHoy"
-
-                                    : v.FechaVencimiento.Value.Date
-                                        <= hoy.AddDays(3)
+                                    : v.FechaVencimiento.Value < inicioCuatroDiasUtc
                                         ? "VencePronto"
-
                                         : "AlDia",
 
                     DiasAtraso =
                         v.FechaVencimiento.HasValue &&
-                        v.FechaVencimiento.Value.Date < hoy
-
-                            ? (hoy -
-                                v.FechaVencimiento.Value.Date).Days
-
+                        v.FechaVencimiento.Value < inicioHoyUtc
+                            ? (inicioHoyUtc -
+                                v.FechaVencimiento.Value).Days
                             : 0,
 
                     DiasParaVencer =
                         v.FechaVencimiento.HasValue &&
-                        v.FechaVencimiento.Value.Date >= hoy
-
-                            ? (v.FechaVencimiento.Value.Date -
-                                hoy).Days
-
+                        v.FechaVencimiento.Value >= inicioMananaUtc
+                            ? (v.FechaVencimiento.Value -
+                                inicioHoyUtc).Days
                             : 0
                 })
                 .ToListAsync();
@@ -198,17 +202,13 @@ namespace RawSuplementos.Api.Controllers
             return Ok(new
             {
                 cliente,
-
                 ventasPendientes = ventas.Count,
-
                 ventasVencidas =
                     ventas.Count(v =>
                         v.EstadoCobro == "Vencida"),
-
                 ventasVenceHoy =
                     ventas.Count(v =>
                         v.EstadoCobro == "VenceHoy"),
-
                 ventas
             });
         }
@@ -250,13 +250,8 @@ namespace RawSuplementos.Api.Controllers
                         .Select(d => new
                         {
                             d.ProductoId,
-
-                            Producto =
-                                d.Producto.Nombre,
-
-                            Marca =
-                                d.Producto.Marca,
-
+                            Producto = d.Producto.Nombre,
+                            Marca = d.Producto.Marca,
                             d.Cantidad,
                             d.PrecioUnitario,
                             d.Subtotal
@@ -273,9 +268,7 @@ namespace RawSuplementos.Api.Controllers
                             p.MetodoPago,
                             p.Referencia,
                             p.Notas,
-
-                            RegistradoPor =
-                                p.Usuario.Nombre
+                            RegistradoPor = p.Usuario.Nombre
                         })
                         .ToList(),
 
@@ -300,9 +293,8 @@ namespace RawSuplementos.Api.Controllers
                 );
             }
 
-            // Calculamos estado de cobro después
-            // de recuperar la venta.
-            var hoy = FechaHelper.AhoraUtc();
+            var (inicioHoyUtc, inicioMananaUtc, inicioCuatroDiasUtc) =
+                ObtenerLimitesCobro();
 
             string estadoCobro;
             int diasAtraso = 0;
@@ -315,32 +307,29 @@ namespace RawSuplementos.Api.Controllers
             else
             {
                 var vencimiento =
-                    venta.FechaVencimiento.Value.Date;
+                    venta.FechaVencimiento.Value;
 
-                if (vencimiento < hoy)
+                if (vencimiento < inicioHoyUtc)
                 {
                     estadoCobro = "Vencida";
-
                     diasAtraso =
-                        (hoy - vencimiento).Days;
+                        (inicioHoyUtc - vencimiento).Days;
                 }
-                else if (vencimiento == hoy)
+                else if (vencimiento < inicioMananaUtc)
                 {
                     estadoCobro = "VenceHoy";
                 }
-                else if (vencimiento <= hoy.AddDays(3))
+                else if (vencimiento < inicioCuatroDiasUtc)
                 {
                     estadoCobro = "VencePronto";
-
                     diasParaVencer =
-                        (vencimiento - hoy).Days;
+                        (vencimiento - inicioHoyUtc).Days;
                 }
                 else
                 {
                     estadoCobro = "AlDia";
-
                     diasParaVencer =
-                        (vencimiento - hoy).Days;
+                        (vencimiento - inicioHoyUtc).Days;
                 }
             }
 
@@ -348,25 +337,17 @@ namespace RawSuplementos.Api.Controllers
             {
                 venta.Id,
                 venta.Cliente,
-
                 venta.Fecha,
                 venta.FechaVencimiento,
-
                 venta.Subtotal,
                 venta.Descuento,
                 venta.Total,
-
                 venta.TotalPagado,
                 venta.Pendiente,
-
                 venta.Estado,
-
                 EstadoCobro = estadoCobro,
-
                 DiasAtraso = diasAtraso,
-
                 DiasParaVencer = diasParaVencer,
-
                 venta.Notas,
                 venta.Detalles,
                 venta.Pagos
@@ -381,7 +362,8 @@ namespace RawSuplementos.Api.Controllers
         [HttpGet("resumen")]
         public async Task<IActionResult> ObtenerResumen()
         {
-            var hoy = FechaHelper.AhoraUtc();
+            var (inicioHoyUtc, inicioMananaUtc, inicioCuatroDiasUtc) =
+                ObtenerLimitesCobro();
 
             var totalPorCobrar =
                 await _context.MovimientosCuenta
@@ -411,7 +393,7 @@ namespace RawSuplementos.Api.Controllers
                         (v.Estado == "Pendiente" ||
                          v.Estado == "Parcial") &&
                         v.FechaVencimiento.HasValue &&
-                        v.FechaVencimiento.Value.Date < hoy
+                        v.FechaVencimiento.Value < inicioHoyUtc
                     );
 
             var vencenHoy =
@@ -420,7 +402,8 @@ namespace RawSuplementos.Api.Controllers
                         (v.Estado == "Pendiente" ||
                          v.Estado == "Parcial") &&
                         v.FechaVencimiento.HasValue &&
-                        v.FechaVencimiento.Value.Date == hoy
+                        v.FechaVencimiento.Value >= inicioHoyUtc &&
+                        v.FechaVencimiento.Value < inicioMananaUtc
                     );
 
             var vencenProximos3Dias =
@@ -429,9 +412,8 @@ namespace RawSuplementos.Api.Controllers
                         (v.Estado == "Pendiente" ||
                          v.Estado == "Parcial") &&
                         v.FechaVencimiento.HasValue &&
-                        v.FechaVencimiento.Value.Date > hoy &&
-                        v.FechaVencimiento.Value.Date
-                            <= hoy.AddDays(3)
+                        v.FechaVencimiento.Value >= inicioMananaUtc &&
+                        v.FechaVencimiento.Value < inicioCuatroDiasUtc
                     );
 
             return Ok(new
