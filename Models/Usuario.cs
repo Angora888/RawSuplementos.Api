@@ -1,10 +1,13 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace RawSuplementos.Api.Models
 {
     public class Usuario
     {
         public int Id { get; set; }
+
+        public int NegocioId { get; set; }
+        public Negocio Negocio { get; set; } = null!;
 
         [Required]
         [MaxLength(120)]
