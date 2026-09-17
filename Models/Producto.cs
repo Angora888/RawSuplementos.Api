@@ -1,10 +1,13 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace RawSuplementos.Api.Models
 {
     public class Producto
     {
         public int Id { get; set; }
+
+        public int NegocioId { get; set; }
+        public Negocio Negocio { get; set; } = null!;
 
         [Required]
         [MaxLength(150)]
@@ -20,25 +23,16 @@ namespace RawSuplementos.Api.Models
         public string? Sabor { get; set; }
 
         public decimal PrecioCompra { get; set; }
-
         public decimal PrecioVenta { get; set; }
-
         public int Stock { get; set; }
-
         public int StockMinimo { get; set; }
-
         public string? ImageUrl { get; set; }
-
         public bool Activo { get; set; } = true;
 
         public int CategoriaId { get; set; }
-
         public Categoria Categoria { get; set; } = null!;
 
-        public ICollection<VentaDetalle> VentaDetalles { get; set; }
-            = new List<VentaDetalle>();
-
-        public ICollection<MovimientoInventario> MovimientosInventario { get; set; }
-    = new List<MovimientoInventario>();
+        public ICollection<VentaDetalle> VentaDetalles { get; set; } = new List<VentaDetalle>();
+        public ICollection<MovimientoInventario> MovimientosInventario { get; set; } = new List<MovimientoInventario>();
     }
 }
