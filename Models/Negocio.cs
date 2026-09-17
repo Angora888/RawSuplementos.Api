@@ -32,6 +32,12 @@ namespace RawSuplementos.Api.Models
         [MaxLength(20)]
         public string? ColorSecundario { get; set; }
 
+        [MaxLength(180)]
+        public string? TituloLanding { get; set; }
+
+        [MaxLength(500)]
+        public string? DescripcionLanding { get; set; }
+
         public bool Activo { get; set; } = true;
 
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
