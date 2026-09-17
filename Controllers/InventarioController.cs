@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,169 +21,89 @@ namespace RawSuplementos.Api.Controllers
             _context = context;
         }
 
-        // ==========================================
-        // POST: api/inventario/ajustar/5
-        // ==========================================
+        private int? ObtenerNegocioId()
+        {
+            var claim = User.FindFirst("negocioId")?.Value;
+            return int.TryParse(claim, out var negocioId) ? negocioId : null;
+        }
 
         [HttpPost("ajustar/{productoId:int}")]
-        public async Task<IActionResult> AjustarInventario(
-            int productoId,
-            AjustarInventarioDto dto)
+        public async Task<IActionResult> AjustarInventario(int productoId, AjustarInventarioDto dto)
         {
-            var usuarioIdClaim =
-                User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var negocioId = ObtenerNegocioId();
+            if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
 
+            var usuarioIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!int.TryParse(usuarioIdClaim, out int usuarioId))
-            {
-                return Unauthorized(
-                    "No se pudo identificar al usuario."
-                );
-            }
+                return Unauthorized("No se pudo identificar al usuario.");
 
-            if (dto.Cantidad == 0)
-            {
-                return BadRequest(
-                    "La cantidad no puede ser cero."
-                );
-            }
+            var usuarioValido = await _context.Usuarios.AsNoTracking()
+                .AnyAsync(u => u.Id == usuarioId && u.NegocioId == negocioId.Value && u.Activo);
+            if (!usuarioValido) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
 
-            var tiposPermitidos = new[]
-            {
-                "Entrada",
-                "Ajuste",
-                "Devolucion",
-                "Perdida",
-                "Correccion"
-            };
+            if (dto.Cantidad == 0) return BadRequest("La cantidad no puede ser cero.");
 
-            if (!tiposPermitidos.Contains(dto.Tipo))
-            {
-                return BadRequest(
-                    "Tipo de movimiento inválido."
-                );
-            }
+            var tiposPermitidos = new[] { "Entrada", "Ajuste", "Devolucion", "Perdida", "Correccion" };
+            if (!tiposPermitidos.Contains(dto.Tipo)) return BadRequest("Tipo de movimiento inválido.");
 
             var producto = await _context.Productos
-                .FirstOrDefaultAsync(p =>
-                    p.Id == productoId &&
-                    p.Activo);
-
-            if (producto == null)
-            {
-                return NotFound(
-                    "Producto no encontrado."
-                );
-            }
+                .FirstOrDefaultAsync(p => p.Id == productoId && p.NegocioId == negocioId.Value && p.Activo);
+            if (producto == null) return NotFound("Producto no encontrado.");
 
             var stockAnterior = producto.Stock;
-
-            var stockNuevo =
-                stockAnterior + dto.Cantidad;
-
+            var stockNuevo = stockAnterior + dto.Cantidad;
             if (stockNuevo < 0)
-            {
-                return BadRequest(
-                    $"El ajuste dejaría el stock en negativo. Stock actual: {stockAnterior}."
-                );
-            }
+                return BadRequest($"El ajuste dejaría el stock en negativo. Stock actual: {stockAnterior}.");
 
             producto.Stock = stockNuevo;
 
             var movimiento = new MovimientoInventario
             {
                 ProductoId = producto.Id,
-
                 UsuarioId = usuarioId,
-
                 Tipo = dto.Tipo,
-
                 Cantidad = dto.Cantidad,
-
                 StockAnterior = stockAnterior,
-
                 StockNuevo = stockNuevo,
-
                 Fecha = FechaHelper.AhoraUtc(),
-
-                Motivo =
-                    string.IsNullOrWhiteSpace(dto.Motivo)
-                        ? null
-                        : dto.Motivo.Trim()
+                Motivo = string.IsNullOrWhiteSpace(dto.Motivo) ? null : dto.Motivo.Trim()
             };
 
             _context.MovimientosInventario.Add(movimiento);
-
             await _context.SaveChangesAsync();
 
             return Ok(new
             {
                 mensaje = "Inventario actualizado correctamente.",
-
-                producto = new
-                {
-                    producto.Id,
-                    producto.Nombre,
-                    stockAnterior,
-                    stockNuevo
-                },
-
-                movimiento = new
-                {
-                    movimiento.Tipo,
-                    movimiento.Cantidad,
-                    movimiento.Fecha,
-                    movimiento.Motivo
-                }
+                producto = new { producto.Id, producto.Nombre, stockAnterior, stockNuevo },
+                movimiento = new { movimiento.Tipo, movimiento.Cantidad, movimiento.Fecha, movimiento.Motivo }
             });
         }
 
-        // ==========================================
-        // GET: api/inventario/producto/5
-        // ==========================================
-
         [HttpGet("producto/{productoId:int}")]
-        public async Task<IActionResult> ObtenerMovimientosProducto(
-            int productoId)
+        public async Task<IActionResult> ObtenerMovimientosProducto(int productoId)
         {
-            var producto = await _context.Productos
-                .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == productoId);
+            var negocioId = ObtenerNegocioId();
+            if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
 
-            if (producto == null)
-            {
-                return NotFound(
-                    "Producto no encontrado."
-                );
-            }
+            var producto = await _context.Productos.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == productoId && p.NegocioId == negocioId.Value);
+            if (producto == null) return NotFound("Producto no encontrado.");
 
-            var movimientos = await _context.MovimientosInventario
-                .AsNoTracking()
-                .Where(m => m.ProductoId == productoId)
+            var movimientos = await _context.MovimientosInventario.AsNoTracking()
+                .Where(m => m.ProductoId == productoId && m.Producto.NegocioId == negocioId.Value)
                 .OrderByDescending(m => m.Fecha)
                 .Select(m => new
                 {
-                    m.Id,
-                    m.Tipo,
-                    m.Cantidad,
-                    m.StockAnterior,
-                    m.StockNuevo,
-                    m.Fecha,
-                    m.Motivo,
-                    m.VentaId,
-
+                    m.Id, m.Tipo, m.Cantidad, m.StockAnterior, m.StockNuevo,
+                    m.Fecha, m.Motivo, m.VentaId,
                     Usuario = m.Usuario.Nombre
                 })
                 .ToListAsync();
 
             return Ok(new
             {
-                producto = new
-                {
-                    producto.Id,
-                    producto.Nombre,
-                    producto.Stock
-                },
-
+                producto = new { producto.Id, producto.Nombre, producto.Stock },
                 movimientos
             });
         }

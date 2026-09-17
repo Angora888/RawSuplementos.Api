@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RawSuplementos.Api.Data;
+using System.Security.Claims;
 
 namespace RawSuplementos.Api.Controllers
 {
@@ -12,21 +13,26 @@ namespace RawSuplementos.Api.Controllers
     {
         private readonly ApplicationDbContext _context;
 
-        public UsuariosController(
-            ApplicationDbContext context)
+        public UsuariosController(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        // ==========================================
-        // GET: api/usuarios
-        // ==========================================
+        private int? ObtenerNegocioId()
+        {
+            var claim = User.FindFirst("negocioId")?.Value;
+            return int.TryParse(claim, out var negocioId) ? negocioId : null;
+        }
 
         [HttpGet]
         public async Task<IActionResult> ObtenerUsuarios()
         {
+            var negocioId = ObtenerNegocioId();
+            if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
+
             var usuarios = await _context.Usuarios
                 .AsNoTracking()
+                .Where(u => u.NegocioId == negocioId.Value)
                 .OrderBy(u => u.Nombre)
                 .Select(u => new
                 {
@@ -42,16 +48,15 @@ namespace RawSuplementos.Api.Controllers
             return Ok(usuarios);
         }
 
-        // ==========================================
-        // GET: api/usuarios/5
-        // ==========================================
-
         [HttpGet("{id:int}")]
         public async Task<IActionResult> ObtenerUsuario(int id)
         {
+            var negocioId = ObtenerNegocioId();
+            if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
+
             var usuario = await _context.Usuarios
                 .AsNoTracking()
-                .Where(u => u.Id == id)
+                .Where(u => u.Id == id && u.NegocioId == negocioId.Value)
                 .Select(u => new
                 {
                     u.Id,
@@ -63,45 +68,33 @@ namespace RawSuplementos.Api.Controllers
                 })
                 .FirstOrDefaultAsync();
 
-            if (usuario == null)
-            {
-                return NotFound(
-                    "Usuario no encontrado."
-                );
-            }
-
+            if (usuario == null) return NotFound("Usuario no encontrado.");
             return Ok(usuario);
         }
 
-        // ==========================================
-        // PUT: api/usuarios/5/estado
-        // ==========================================
-
         [HttpPut("{id:int}/estado")]
-        public async Task<IActionResult> CambiarEstadoUsuario(
-            int id,
-            [FromQuery] bool activo)
+        public async Task<IActionResult> CambiarEstadoUsuario(int id, [FromQuery] bool activo)
         {
-            var usuario = await _context.Usuarios
-                .FirstOrDefaultAsync(u => u.Id == id);
+            var negocioId = ObtenerNegocioId();
+            if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
 
-            if (usuario == null)
-            {
-                return NotFound(
-                    "Usuario no encontrado."
-                );
-            }
+            var usuarioIdActualTexto = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var usuarioIdActual = int.TryParse(usuarioIdActualTexto, out var actualId) ? actualId : 0;
+
+            if (id == usuarioIdActual && !activo)
+                return BadRequest("No puede desactivar su propio usuario.");
+
+            var usuario = await _context.Usuarios
+                .FirstOrDefaultAsync(u => u.Id == id && u.NegocioId == negocioId.Value);
+
+            if (usuario == null) return NotFound("Usuario no encontrado.");
 
             usuario.Activo = activo;
-
             await _context.SaveChangesAsync();
 
             return Ok(new
             {
-                mensaje = activo
-                    ? "Usuario activado correctamente."
-                    : "Usuario desactivado correctamente.",
-
+                mensaje = activo ? "Usuario activado correctamente." : "Usuario desactivado correctamente.",
                 usuario = new
                 {
                     usuario.Id,

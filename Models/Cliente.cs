@@ -1,4 +1,4 @@
-﻿using RawSuplementos.Api.Helpers;
+using RawSuplementos.Api.Helpers;
 using System.ComponentModel.DataAnnotations;
 
 namespace RawSuplementos.Api.Models
@@ -6,6 +6,9 @@ namespace RawSuplementos.Api.Models
     public class Cliente
     {
         public int Id { get; set; }
+
+        public int NegocioId { get; set; }
+        public Negocio Negocio { get; set; } = null!;
 
         [Required]
         [MaxLength(150)]
@@ -22,12 +25,9 @@ namespace RawSuplementos.Api.Models
         public string? Notas { get; set; }
 
         public bool Activo { get; set; } = true;
-
         public DateTime FechaCreacion { get; set; } = FechaHelper.AhoraCostaRica();
 
         public ICollection<Venta> Ventas { get; set; } = new List<Venta>();
-
-        public ICollection<MovimientoCuenta> MovimientosCuenta { get; set; }
-            = new List<MovimientoCuenta>();
+        public ICollection<MovimientoCuenta> MovimientosCuenta { get; set; } = new List<MovimientoCuenta>();
     }
 }

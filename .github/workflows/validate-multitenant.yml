@@ -1,0 +1,100 @@
+name: Validate Multitenant API
+
+on:
+  push:
+    branches:
+      - feature/multitenant
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: raw_test
+          POSTGRES_PASSWORD: raw_test_password
+          POSTGRES_DB: raw_suplementos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U raw_test -d raw_suplementos_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      ConnectionStrings__DefaultConnection: Host=localhost;Port=5432;Database=raw_suplementos_test;Username=raw_test;Password=raw_test_password
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore RawSuplementos.csproj
+
+      - name: Build
+        run: dotnet build RawSuplementos.csproj --configuration Release --no-restore
+
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.11
+
+      - name: List migrations
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet ef migrations list --project RawSuplementos.csproj --no-build --configuration Release
+
+      - name: Generate migration SQL
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet ef migrations script 0 20260917170000_AgregarMultitenancy --project RawSuplementos.csproj --no-build --configuration Release --output multitenant-migration.sql
+
+      - name: Apply migrations to temporary PostgreSQL
+        run: |
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          dotnet ef database update 20260917170000_AgregarMultitenancy --project RawSuplementos.csproj --no-build --configuration Release
+
+      - name: Verify RAW tenant and backfill
+        env:
+          PGPASSWORD: raw_test_password
+        run: |
+          psql -h localhost -U raw_test -d raw_suplementos_test -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+              tenant_id integer;
+          BEGIN
+              SELECT "Id" INTO tenant_id
+              FROM "Negocios"
+              WHERE "Slug" = 'raw-suplementos' AND "Activo" = TRUE;
+
+              IF tenant_id IS NULL THEN
+                  RAISE EXCEPTION 'RAW Suplementos tenant was not created correctly';
+              END IF;
+
+              IF EXISTS (SELECT 1 FROM "Usuarios" WHERE "NegocioId" IS NULL) OR
+                 EXISTS (SELECT 1 FROM "Categorias" WHERE "NegocioId" IS NULL) OR
+                 EXISTS (SELECT 1 FROM "Clientes" WHERE "NegocioId" IS NULL) OR
+                 EXISTS (SELECT 1 FROM "Productos" WHERE "NegocioId" IS NULL) OR
+                 EXISTS (SELECT 1 FROM "Ventas" WHERE "NegocioId" IS NULL) THEN
+                  RAISE EXCEPTION 'Multitenant backfill left NULL NegocioId values';
+              END IF;
+          END $$;
+          SQL
+
+      - name: Upload migration SQL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: multitenant-migration-sql
+          path: multitenant-migration.sql
+          if-no-files-found: ignore
