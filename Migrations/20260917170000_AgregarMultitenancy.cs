@@ -1,10 +1,14 @@
 using System;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using RawSuplementos.Api.Data;
 
 #nullable disable
 
 namespace RawSuplementos.Api.Migrations
 {
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20260917170000_AgregarMultitenancy")]
     public partial class AgregarMultitenancy : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -30,22 +34,20 @@ namespace RawSuplementos.Api.Migrations
 
             migrationBuilder.CreateIndex(name: "IX_Negocios_Slug", table: "Negocios", column: "Slug", unique: true);
 
-            // Se agregan primero como nullable para poder conservar y asociar los datos existentes.
             migrationBuilder.AddColumn<int>(name: "NegocioId", table: "Usuarios", type: "integer", nullable: true);
             migrationBuilder.AddColumn<int>(name: "NegocioId", table: "Categorias", type: "integer", nullable: true);
             migrationBuilder.AddColumn<int>(name: "NegocioId", table: "Clientes", type: "integer", nullable: true);
             migrationBuilder.AddColumn<int>(name: "NegocioId", table: "Productos", type: "integer", nullable: true);
             migrationBuilder.AddColumn<int>(name: "NegocioId", table: "Ventas", type: "integer", nullable: true);
 
-            // Tenant inicial para todos los datos RAW que ya existen.
             migrationBuilder.Sql("""
                 INSERT INTO "Negocios"
                     ("Nombre", "Slug", "WhatsApp", "Activo", "FechaCreacion")
                 VALUES
-                    ('RAW Suplementos', 'raw-suplementos', '50672509174', TRUE, NOW());
+                    ('RAW Suplementos', 'raw-suplementos', '50672509174', TRUE, NOW())
+                ON CONFLICT ("Slug") DO NOTHING;
                 """);
 
-            // No se asume que el Id sea 1: se obtiene por el slug único.
             migrationBuilder.Sql("""
                 UPDATE "Usuarios"
                 SET "NegocioId" = (SELECT "Id" FROM "Negocios" WHERE "Slug" = 'raw-suplementos')
@@ -68,14 +70,12 @@ namespace RawSuplementos.Api.Migrations
                 WHERE "NegocioId" IS NULL;
                 """);
 
-            // Después del backfill los campos pasan a ser obligatorios.
             migrationBuilder.AlterColumn<int>(name: "NegocioId", table: "Usuarios", type: "integer", nullable: false, oldClrType: typeof(int), oldType: "integer", oldNullable: true);
             migrationBuilder.AlterColumn<int>(name: "NegocioId", table: "Categorias", type: "integer", nullable: false, oldClrType: typeof(int), oldType: "integer", oldNullable: true);
             migrationBuilder.AlterColumn<int>(name: "NegocioId", table: "Clientes", type: "integer", nullable: false, oldClrType: typeof(int), oldType: "integer", oldNullable: true);
             migrationBuilder.AlterColumn<int>(name: "NegocioId", table: "Productos", type: "integer", nullable: false, oldClrType: typeof(int), oldType: "integer", oldNullable: true);
             migrationBuilder.AlterColumn<int>(name: "NegocioId", table: "Ventas", type: "integer", nullable: false, oldClrType: typeof(int), oldType: "integer", oldNullable: true);
 
-            // Sustituimos índices globales por índices tenant-aware donde corresponde.
             migrationBuilder.DropIndex(name: "IX_Categorias_Nombre", table: "Categorias");
             migrationBuilder.DropIndex(name: "IX_Clientes_Telefono", table: "Clientes");
 
