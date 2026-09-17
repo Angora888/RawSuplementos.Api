@@ -128,7 +128,8 @@ builder.Services.AddCors(options =>
             policy
                 .WithOrigins(
                     "http://localhost:5173",
-                    "https://raw-suplementos.vercel.app"
+                    "https://raw-suplementos.vercel.app",
+                    "https://miemprendimiento.vercel.app"
                 )
                 .AllowAnyHeader()
                 .AllowAnyMethod();
@@ -157,7 +158,7 @@ if (app.Environment.IsDevelopment())
     {
         options.SwaggerEndpoint(
             "/swagger/v1/swagger.json",
-            "RAW Suplementos API v1"
+            "Mi Emprendimiento API v1"
         );
 
         options.RoutePrefix =
