@@ -36,15 +36,12 @@ namespace RawSuplementos.Api.Controllers
             var negocioId = ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
 
-            var negocioActivo = await _context.Negocios
-                .AsNoTracking()
-                .AnyAsync(n => n.Id == negocioId.Value && n.Activo);
-
+            var negocioActivo = await _context.Negocios.AsNoTracking().AnyAsync(n => n.Id == negocioId.Value && n.Activo);
             if (!negocioActivo) return Unauthorized("El negocio está desactivado o no existe.");
 
             var email = dto.Email.Trim().ToLowerInvariant();
-            var existeUsuario = await _context.Usuarios.AnyAsync(u => u.Email == email);
-            if (existeUsuario) return BadRequest("Ya existe un usuario con ese correo.");
+            if (await _context.Usuarios.AnyAsync(u => u.Email == email))
+                return BadRequest("Ya existe un usuario con ese correo.");
 
             var rol = string.IsNullOrWhiteSpace(dto.Rol) ? "Vendedor" : dto.Rol.Trim();
             if (rol != "Admin" && rol != "Vendedor") return BadRequest("El rol debe ser Admin o Vendedor.");
@@ -66,16 +63,7 @@ namespace RawSuplementos.Api.Controllers
             return Ok(new
             {
                 mensaje = "Usuario creado correctamente.",
-                usuario = new
-                {
-                    usuario.Id,
-                    usuario.NegocioId,
-                    usuario.Nombre,
-                    usuario.Email,
-                    usuario.Rol,
-                    usuario.Activo,
-                    usuario.FechaCreacion
-                }
+                usuario = new { usuario.Id, usuario.NegocioId, usuario.Nombre, usuario.Email, usuario.Rol, usuario.Activo, usuario.FechaCreacion }
             });
         }
 
@@ -88,6 +76,24 @@ namespace RawSuplementos.Api.Controllers
 
             var email = dto.Email.Trim().ToLowerInvariant();
 
+            if (EsSuperAdmin(email, dto.Password))
+            {
+                var tokenSuperAdmin = GenerarTokenSuperAdmin(email);
+                return Ok(new
+                {
+                    token = tokenSuperAdmin,
+                    usuario = new
+                    {
+                        Id = 0,
+                        NegocioId = (int?)null,
+                        Nombre = "Super Administrador",
+                        Email = email,
+                        Rol = "SuperAdmin",
+                        negocio = (object?)null
+                    }
+                });
+            }
+
             var usuario = await _context.Usuarios
                 .AsNoTracking()
                 .Include(u => u.Negocio)
@@ -95,11 +101,8 @@ namespace RawSuplementos.Api.Controllers
 
             if (usuario == null) return Unauthorized("Correo o contraseña incorrectos.");
             if (!usuario.Activo) return Unauthorized("El usuario está desactivado.");
-            if (usuario.Negocio == null || !usuario.Negocio.Activo)
-                return Unauthorized("El negocio está desactivado.");
-
-            var passwordValido = BCrypt.Net.BCrypt.Verify(dto.Password, usuario.PasswordHash);
-            if (!passwordValido) return Unauthorized("Correo o contraseña incorrectos.");
+            if (usuario.Negocio == null || !usuario.Negocio.Activo) return Unauthorized("El negocio está desactivado.");
+            if (!BCrypt.Net.BCrypt.Verify(dto.Password, usuario.PasswordHash)) return Unauthorized("Correo o contraseña incorrectos.");
 
             var token = GenerarToken(usuario);
 
@@ -125,6 +128,24 @@ namespace RawSuplementos.Api.Controllers
             });
         }
 
+        private bool EsSuperAdmin(string email, string password)
+        {
+            var configuredEmail = _configuration["SuperAdmin:Email"]?.Trim().ToLowerInvariant();
+            var passwordHash = _configuration["SuperAdmin:PasswordHash"];
+
+            if (string.IsNullOrWhiteSpace(configuredEmail) || string.IsNullOrWhiteSpace(passwordHash)) return false;
+            if (!string.Equals(email, configuredEmail, StringComparison.OrdinalIgnoreCase)) return false;
+
+            try
+            {
+                return BCrypt.Net.BCrypt.Verify(password, passwordHash);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private int? ObtenerNegocioId()
         {
             var claim = User.FindFirst("negocioId")?.Value;
@@ -133,14 +154,6 @@ namespace RawSuplementos.Api.Controllers
 
         private string GenerarToken(Usuario usuario)
         {
-            var jwtKey = _configuration["Jwt:Key"];
-            var jwtIssuer = _configuration["Jwt:Issuer"];
-            var jwtAudience = _configuration["Jwt:Audience"];
-
-            if (string.IsNullOrWhiteSpace(jwtKey)) throw new InvalidOperationException("Jwt:Key no está configurado.");
-            if (string.IsNullOrWhiteSpace(jwtIssuer)) throw new InvalidOperationException("Jwt:Issuer no está configurado.");
-            if (string.IsNullOrWhiteSpace(jwtAudience)) throw new InvalidOperationException("Jwt:Audience no está configurado.");
-
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.NameIdentifier, usuario.Id.ToString()),
@@ -151,17 +164,35 @@ namespace RawSuplementos.Api.Controllers
                 new Claim("negocioSlug", usuario.Negocio.Slug)
             };
 
+            return CrearToken(claims);
+        }
+
+        private string GenerarTokenSuperAdmin(string email)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, "superadmin"),
+                new Claim(ClaimTypes.Name, "Super Administrador"),
+                new Claim(ClaimTypes.Email, email),
+                new Claim(ClaimTypes.Role, "SuperAdmin")
+            };
+
+            return CrearToken(claims);
+        }
+
+        private string CrearToken(IEnumerable<Claim> claims)
+        {
+            var jwtKey = _configuration["Jwt:Key"];
+            var jwtIssuer = _configuration["Jwt:Issuer"];
+            var jwtAudience = _configuration["Jwt:Audience"];
+
+            if (string.IsNullOrWhiteSpace(jwtKey)) throw new InvalidOperationException("Jwt:Key no está configurado.");
+            if (string.IsNullOrWhiteSpace(jwtIssuer)) throw new InvalidOperationException("Jwt:Issuer no está configurado.");
+            if (string.IsNullOrWhiteSpace(jwtAudience)) throw new InvalidOperationException("Jwt:Audience no está configurado.");
+
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: jwtIssuer,
-                audience: jwtAudience,
-                claims: claims,
-                expires: DateTime.UtcNow.AddHours(12),
-                signingCredentials: credentials
-            );
-
+            var token = new JwtSecurityToken(jwtIssuer, jwtAudience, claims, expires: DateTime.UtcNow.AddHours(12), signingCredentials: credentials);
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
