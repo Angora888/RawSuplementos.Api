@@ -39,6 +39,7 @@ namespace RawSuplementos.Api.Controllers
                     n.ColorPrimario,
                     n.ColorSecundario,
                     n.Activo,
+                    n.Bloqueado,
                     n.FechaCreacion,
                     Usuarios = n.Usuarios.Count(),
                     Productos = _context.Productos.Count(p => p.NegocioId == n.Id),
@@ -110,6 +111,7 @@ namespace RawSuplementos.Api.Controllers
                     negocio.Nombre,
                     negocio.Slug,
                     negocio.Activo,
+                    negocio.Bloqueado,
                     negocio.WhatsApp,
                     negocio.LogoUrl,
                     catalogo = $"/catalogo/{negocio.Slug}"
@@ -143,6 +145,25 @@ namespace RawSuplementos.Api.Controllers
             });
         }
 
+
+        [HttpPut("negocios/{id:int}/bloqueo")]
+        public async Task<IActionResult> CambiarBloqueo(int id, [FromBody] CambiarBloqueoNegocioDto dto)
+        {
+            var negocio = await _context.Negocios.FirstOrDefaultAsync(n => n.Id == id);
+            if (negocio == null) return NotFound("Negocio no encontrado.");
+
+            negocio.Bloqueado = dto.Bloqueado;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                mensaje = negocio.Bloqueado ? "Negocio bloqueado por pago pendiente." : "Bloqueo del negocio removido.",
+                negocio.Id,
+                negocio.Nombre,
+                negocio.Bloqueado
+            });
+        }
+
         private static string NormalizarSlug(string valor)
         {
             var slug = (valor ?? string.Empty).Trim().ToLowerInvariant();
@@ -156,6 +177,11 @@ namespace RawSuplementos.Api.Controllers
         {
             return string.IsNullOrWhiteSpace(valor) ? null : valor.Trim();
         }
+    }
+
+    public class CambiarBloqueoNegocioDto
+    {
+        public bool Bloqueado { get; set; }
     }
 
     public class CambiarEstadoNegocioDto
