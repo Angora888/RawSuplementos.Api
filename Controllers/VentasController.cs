@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using RawSuplementos.Api.Data;
 using RawSuplementos.Api.DTOs;
 using RawSuplementos.Api.Helpers;
 using RawSuplementos.Api.Services;
