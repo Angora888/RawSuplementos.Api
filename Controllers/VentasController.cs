@@ -1,10 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using RawSuplementos.Api.Data;
 using RawSuplementos.Api.DTOs;
 using RawSuplementos.Api.Helpers;
-using RawSuplementos.Api.Models;
 using RawSuplementos.Api.Services;
 
 namespace RawSuplementos.Api.Controllers
@@ -14,14 +12,12 @@ namespace RawSuplementos.Api.Controllers
     [Authorize]
     public class VentasController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
         private readonly UsuarioTenantService _usuarioTenantService;
         private readonly VentaService _ventaService;
         private readonly VentaConsultaService _ventaConsultaService;
 
-        public VentasController(ApplicationDbContext context, UsuarioTenantService usuarioTenantService, VentaService ventaService, VentaConsultaService ventaConsultaService)
+        public VentasController(UsuarioTenantService usuarioTenantService, VentaService ventaService, VentaConsultaService ventaConsultaService)
         {
-            _context = context;
             _usuarioTenantService = usuarioTenantService;
             _ventaService = ventaService;
             _ventaConsultaService = ventaConsultaService;
