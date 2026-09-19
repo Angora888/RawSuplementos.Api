@@ -17,12 +17,14 @@ namespace RawSuplementos.Api.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UsuarioTenantService _usuarioTenantService;
         private readonly VentaService _ventaService;
+        private readonly VentaConsultaService _ventaConsultaService;
 
-        public VentasController(ApplicationDbContext context, UsuarioTenantService usuarioTenantService, VentaService ventaService)
+        public VentasController(ApplicationDbContext context, UsuarioTenantService usuarioTenantService, VentaService ventaService, VentaConsultaService ventaConsultaService)
         {
             _context = context;
             _usuarioTenantService = usuarioTenantService;
             _ventaService = ventaService;
+            _ventaConsultaService = ventaConsultaService;
         }
 
         private static string? ValidarNuevaVenta(CrearVentaDto dto)
@@ -81,21 +83,7 @@ namespace RawSuplementos.Api.Controllers
         {
             var negocioId = User.ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
-            var query = _context.Ventas.AsNoTracking().Where(v => v.NegocioId == negocioId.Value).AsQueryable();
-            if (clienteId.HasValue) query = query.Where(v => v.ClienteId == clienteId.Value);
-            if (!string.IsNullOrWhiteSpace(estado)) query = query.Where(v => v.Estado == estado.Trim());
-            if (fechaDesde.HasValue) { var desde = FechaHelper.CostaRicaAUtc(fechaDesde.Value.Date); query = query.Where(v => v.Fecha >= desde); }
-            if (fechaHasta.HasValue) { var hasta = FechaHelper.CostaRicaAUtc(fechaHasta.Value.Date.AddDays(1)); query = query.Where(v => v.Fecha < hasta); }
-
-            var ventas = await query.OrderByDescending(v => v.Fecha).Select(v => new
-            {
-                v.Id, Cliente = new { v.Cliente.Id, v.Cliente.Nombre, v.Cliente.Telefono }, Usuario = v.Usuario.Nombre,
-                v.Fecha, v.FechaVencimiento, v.Subtotal, v.Descuento, v.Total,
-                Pagado = v.Pagos.Sum(p => (decimal?)p.Monto) ?? 0,
-                Pendiente = v.Total - (v.Pagos.Sum(p => (decimal?)p.Monto) ?? 0), v.Estado, v.Notas,
-                CantidadProductos = v.Detalles.Sum(d => d.Cantidad)
-            }).ToListAsync();
-            return Ok(new { cantidad = ventas.Count, totalVentas = ventas.Where(v => v.Estado != "Anulada").Sum(v => v.Total), ventas });
+            return Ok(await _ventaConsultaService.ObtenerVentasAsync(negocioId.Value, clienteId, estado, fechaDesde, fechaHasta));
         }
 
         [HttpGet("{id:int}")]
@@ -103,16 +91,7 @@ namespace RawSuplementos.Api.Controllers
         {
             var negocioId = User.ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
-            var venta = await _context.Ventas.AsNoTracking().Where(v => v.Id == id && v.NegocioId == negocioId.Value).Select(v => new
-            {
-                v.Id, Cliente = new { v.Cliente.Id, v.Cliente.Nombre, v.Cliente.Telefono, v.Cliente.Direccion },
-                Usuario = new { v.Usuario.Id, v.Usuario.Nombre }, v.Fecha, v.FechaVencimiento, v.Subtotal, v.Descuento, v.Total, v.Estado, v.Notas,
-                Detalles = v.Detalles.Select(d => new { d.Id, d.ProductoId, Producto = d.Producto.Nombre, Marca = d.Producto.Marca, d.Cantidad, d.PrecioUnitario, d.CostoUnitario, d.Subtotal, Ganancia = (d.PrecioUnitario - d.CostoUnitario) * d.Cantidad }).ToList(),
-                Pagos = v.Pagos.OrderByDescending(p => p.Fecha).Select(p => new { p.Id, p.Monto, p.Fecha, p.MetodoPago, p.Referencia, p.Notas, RegistradoPor = p.Usuario.Nombre }).ToList(),
-                TotalPagado = v.Pagos.Sum(p => (decimal?)p.Monto) ?? 0,
-                Pendiente = v.Total - (v.Pagos.Sum(p => (decimal?)p.Monto) ?? 0),
-                Ganancia = v.Detalles.Sum(d => (d.PrecioUnitario - d.CostoUnitario) * d.Cantidad)
-            }).FirstOrDefaultAsync();
+            var venta = await _ventaConsultaService.ObtenerVentaAsync(id, negocioId.Value);
             return venta == null ? NotFound("Venta no encontrada.") : Ok(venta);
         }
 
