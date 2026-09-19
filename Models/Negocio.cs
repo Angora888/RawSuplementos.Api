@@ -59,6 +59,11 @@ namespace RawSuplementos.Api.Models
         [MaxLength(250)]
         public string? TextoFooter { get; set; }
 
+        [MaxLength(30)] public string? HeroEstilo { get; set; }
+        [MaxLength(120)] public string? HeroEtiqueta { get; set; }
+        [MaxLength(180)] public string? HeroTituloResaltado { get; set; }
+        [MaxLength(500)] public string? HeroImagenUrl { get; set; }
+
         public bool Activo { get; set; } = true;
 
         public bool Bloqueado { get; set; } = false;
