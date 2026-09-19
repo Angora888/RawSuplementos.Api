@@ -5,6 +5,7 @@ using RawSuplementos.Api.Data;
 using RawSuplementos.Api.DTOs;
 using RawSuplementos.Api.Helpers;
 using RawSuplementos.Api.Models;
+using RawSuplementos.Api.Services;
 
 namespace RawSuplementos.Api.Controllers
 {
@@ -14,12 +15,13 @@ namespace RawSuplementos.Api.Controllers
     public class VentasController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly UsuarioTenantService _usuarioTenantService;
 
-        public VentasController(ApplicationDbContext context) => _context = context;
-
-
-        private async Task<bool> UsuarioValidoAsync(int usuarioId, int negocioId) =>
-            await _context.Usuarios.AsNoTracking().AnyAsync(u => u.Id == usuarioId && u.NegocioId == negocioId && u.Activo);
+        public VentasController(ApplicationDbContext context, UsuarioTenantService usuarioTenantService)
+        {
+            _context = context;
+            _usuarioTenantService = usuarioTenantService;
+        }
 
         [HttpPost]
         public async Task<IActionResult> CrearVenta(CrearVentaDto dto)
@@ -27,7 +29,7 @@ namespace RawSuplementos.Api.Controllers
             var negocioId = User.ObtenerNegocioId();
             var usuarioId = User.ObtenerUsuarioId();
             if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
-            if (!await UsuarioValidoAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
+            if (!await _usuarioTenantService.EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
 
             if (dto.Productos == null || !dto.Productos.Any()) return BadRequest("Debe agregar al menos un producto.");
             if (dto.Descuento < 0) return BadRequest("El descuento no puede ser negativo.");
@@ -144,7 +146,7 @@ namespace RawSuplementos.Api.Controllers
             var negocioId = User.ObtenerNegocioId();
             var usuarioId = User.ObtenerUsuarioId();
             if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
-            if (!await UsuarioValidoAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
+            if (!await _usuarioTenantService.EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
 
             await using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -238,7 +240,7 @@ namespace RawSuplementos.Api.Controllers
             var negocioId = User.ObtenerNegocioId();
             var usuarioId = User.ObtenerUsuarioId();
             if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
-            if (!await UsuarioValidoAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
+            if (!await _usuarioTenantService.EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
             if (dto.Monto <= 0) return BadRequest("El monto del abono debe ser mayor a cero.");
 
             await using var transaction = await _context.Database.BeginTransactionAsync();
