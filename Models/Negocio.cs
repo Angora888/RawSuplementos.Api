@@ -38,6 +38,27 @@ namespace RawSuplementos.Api.Models
         [MaxLength(500)]
         public string? DescripcionLanding { get; set; }
 
+        [MaxLength(20)]
+        public string? ColorFondo { get; set; }
+
+        [MaxLength(20)]
+        public string? ColorHeader { get; set; }
+
+        [MaxLength(20)]
+        public string? ColorFooter { get; set; }
+
+        [MaxLength(20)]
+        public string? ColorBoton { get; set; }
+
+        [MaxLength(20)]
+        public string? ColorTexto { get; set; }
+
+        [MaxLength(500)]
+        public string? HeroFondoUrl { get; set; }
+
+        [MaxLength(250)]
+        public string? TextoFooter { get; set; }
+
         public bool Activo { get; set; } = true;
 
         public bool Bloqueado { get; set; } = false;
