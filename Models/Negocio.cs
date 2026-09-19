@@ -40,6 +40,8 @@ namespace RawSuplementos.Api.Models
 
         public bool Activo { get; set; } = true;
 
+        public bool Bloqueado { get; set; } = false;
+
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
 
         public ICollection<Usuario> Usuarios { get; set; }
