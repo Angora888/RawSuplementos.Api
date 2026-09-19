@@ -39,7 +39,7 @@ namespace RawSuplementos.Api.Controllers
                     n.WhatsApp,
                     n.ColorPrimario,
                     n.ColorSecundario,
-                    n.ColorFondo, n.ColorHeader, n.ColorFooter, n.ColorBoton, n.ColorTexto, n.HeroFondoUrl, n.TextoFooter
+                    n.ColorFondo, n.ColorHeader, n.ColorFooter, n.ColorBoton, n.ColorTexto, n.HeroFondoUrl, n.TextoFooter, n.HeroEstilo, n.HeroEtiqueta, n.HeroTituloResaltado, n.HeroImagenUrl
                 })
                 .FirstOrDefaultAsync();
 
@@ -68,6 +68,10 @@ namespace RawSuplementos.Api.Controllers
             negocio.ColorTexto = NormalizarColor(dto.ColorTexto, "#172033");
             negocio.HeroFondoUrl = Limpiar(dto.HeroFondoUrl);
             negocio.TextoFooter = Limpiar(dto.TextoFooter);
+            negocio.HeroEstilo = dto.HeroEstilo == "editorial" ? "editorial" : "clasico";
+            negocio.HeroEtiqueta = Limpiar(dto.HeroEtiqueta);
+            negocio.HeroTituloResaltado = Limpiar(dto.HeroTituloResaltado);
+            negocio.HeroImagenUrl = Limpiar(dto.HeroImagenUrl);
 
             await _context.SaveChangesAsync();
 
@@ -84,7 +88,7 @@ namespace RawSuplementos.Api.Controllers
                     negocio.WhatsApp,
                     negocio.ColorPrimario,
                     negocio.ColorSecundario,
-                    negocio.ColorFondo, negocio.ColorHeader, negocio.ColorFooter, negocio.ColorBoton, negocio.ColorTexto, negocio.HeroFondoUrl, negocio.TextoFooter
+                    negocio.ColorFondo, negocio.ColorHeader, negocio.ColorFooter, negocio.ColorBoton, negocio.ColorTexto, negocio.HeroFondoUrl, negocio.TextoFooter, negocio.HeroEstilo, negocio.HeroEtiqueta, negocio.HeroTituloResaltado, negocio.HeroImagenUrl
                 }
             });
         }
