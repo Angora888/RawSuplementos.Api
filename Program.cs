@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using RawSuplementos.Api.Data;
+using RawSuplementos.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,7 @@ var builder = WebApplication.CreateBuilder(args);
 // =========================
 
 builder.Services.AddControllers();
+builder.Services.AddScoped<UsuarioTenantService>();
 
 
 // =========================
