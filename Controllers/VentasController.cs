@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -18,17 +17,6 @@ namespace RawSuplementos.Api.Controllers
 
         public VentasController(ApplicationDbContext context) => _context = context;
 
-        private int? ObtenerNegocioId()
-        {
-            var claim = User.FindFirst("negocioId")?.Value;
-            return int.TryParse(claim, out var id) ? id : null;
-        }
-
-        private int? ObtenerUsuarioId()
-        {
-            var claim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            return int.TryParse(claim, out var id) ? id : null;
-        }
 
         private async Task<bool> UsuarioValidoAsync(int usuarioId, int negocioId) =>
             await _context.Usuarios.AsNoTracking().AnyAsync(u => u.Id == usuarioId && u.NegocioId == negocioId && u.Activo);
@@ -36,8 +24,8 @@ namespace RawSuplementos.Api.Controllers
         [HttpPost]
         public async Task<IActionResult> CrearVenta(CrearVentaDto dto)
         {
-            var negocioId = ObtenerNegocioId();
-            var usuarioId = ObtenerUsuarioId();
+            var negocioId = User.ObtenerNegocioId();
+            var usuarioId = User.ObtenerUsuarioId();
             if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
             if (!await UsuarioValidoAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
 
@@ -153,8 +141,8 @@ namespace RawSuplementos.Api.Controllers
         [HttpPost("{ventaId:int}/anular")]
         public async Task<IActionResult> AnularVenta(int ventaId, AnularVentaDto dto)
         {
-            var negocioId = ObtenerNegocioId();
-            var usuarioId = ObtenerUsuarioId();
+            var negocioId = User.ObtenerNegocioId();
+            var usuarioId = User.ObtenerUsuarioId();
             if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
             if (!await UsuarioValidoAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
 
@@ -207,7 +195,7 @@ namespace RawSuplementos.Api.Controllers
         [HttpGet]
         public async Task<IActionResult> ObtenerVentas([FromQuery] int? clienteId, [FromQuery] string? estado, [FromQuery] DateTime? fechaDesde, [FromQuery] DateTime? fechaHasta)
         {
-            var negocioId = ObtenerNegocioId();
+            var negocioId = User.ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
             var query = _context.Ventas.AsNoTracking().Where(v => v.NegocioId == negocioId.Value).AsQueryable();
             if (clienteId.HasValue) query = query.Where(v => v.ClienteId == clienteId.Value);
@@ -229,7 +217,7 @@ namespace RawSuplementos.Api.Controllers
         [HttpGet("{id:int}")]
         public async Task<IActionResult> ObtenerVenta(int id)
         {
-            var negocioId = ObtenerNegocioId();
+            var negocioId = User.ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
             var venta = await _context.Ventas.AsNoTracking().Where(v => v.Id == id && v.NegocioId == negocioId.Value).Select(v => new
             {
@@ -247,8 +235,8 @@ namespace RawSuplementos.Api.Controllers
         [HttpPost("{ventaId:int}/abonos")]
         public async Task<IActionResult> RegistrarAbono(int ventaId, RegistrarAbonoDto dto)
         {
-            var negocioId = ObtenerNegocioId();
-            var usuarioId = ObtenerUsuarioId();
+            var negocioId = User.ObtenerNegocioId();
+            var usuarioId = User.ObtenerUsuarioId();
             if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
             if (!await UsuarioValidoAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
             if (dto.Monto <= 0) return BadRequest("El monto del abono debe ser mayor a cero.");
