@@ -83,5 +83,97 @@ namespace RawSuplementos.Api.Services
                 throw;
             }
         }
+
+        public async Task<(bool Ok, bool NotFound, string? Error, object? Data)> AnularAsync(int ventaId, AnularVentaDto dto, int negocioId, int usuarioId)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var venta = await _context.Ventas.Include(v => v.Cliente).Include(v => v.Detalles).ThenInclude(d => d.Producto).Include(v => v.Pagos)
+                    .FirstOrDefaultAsync(v => v.Id == ventaId && v.NegocioId == negocioId);
+                if (venta == null) return (false, true, "La venta no existe.", null);
+                if (venta.Estado == "Anulada") return (false, false, "La venta ya está anulada.", null);
+
+                foreach (var detalle in venta.Detalles)
+                {
+                    if (detalle.Producto.NegocioId != negocioId) return (false, false, "La venta contiene un producto que no pertenece al negocio.", null);
+                    var anterior = detalle.Producto.Stock;
+                    detalle.Producto.Stock += detalle.Cantidad;
+                    _context.MovimientosInventario.Add(new MovimientoInventario
+                    {
+                        ProductoId = detalle.Producto.Id, UsuarioId = usuarioId, VentaId = venta.Id,
+                        Tipo = "Devolucion", Cantidad = detalle.Cantidad, StockAnterior = anterior, StockNuevo = detalle.Producto.Stock,
+                        Fecha = FechaHelper.AhoraUtc(), Motivo = string.IsNullOrWhiteSpace(dto.Motivo) ? $"Devolución por anulación de venta #{venta.Id}" : $"Anulación venta #{venta.Id}: {dto.Motivo.Trim()}"
+                    });
+                }
+
+                var pagado = venta.Pagos.Sum(p => p.Monto);
+                _context.MovimientosCuenta.Add(new MovimientoCuenta
+                {
+                    ClienteId = venta.ClienteId, VentaId = venta.Id, UsuarioId = usuarioId,
+                    Tipo = "AnulacionVenta", Monto = -venta.Total, Fecha = FechaHelper.AhoraUtc(),
+                    Descripcion = string.IsNullOrWhiteSpace(dto.Motivo) ? $"Anulación venta #{venta.Id}" : $"Anulación venta #{venta.Id}: {dto.Motivo.Trim()}"
+                });
+                if (pagado > 0) _context.MovimientosCuenta.Add(new MovimientoCuenta
+                {
+                    ClienteId = venta.ClienteId, VentaId = venta.Id, UsuarioId = usuarioId,
+                    Tipo = "ReversionPago", Monto = pagado, Fecha = FechaHelper.AhoraUtc(), Descripcion = $"Reversión de pagos por anulación de venta #{venta.Id}"
+                });
+
+                venta.Estado = "Anulada";
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return (true, false, null, new { mensaje = "Venta anulada correctamente.", venta = new { venta.Id, Cliente = venta.Cliente.Nombre, venta.Total, TotalPagado = pagado, venta.Estado } });
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
+
+        public async Task<(bool Ok, bool NotFound, string? Error, object? Data)> RegistrarAbonoAsync(int ventaId, RegistrarAbonoDto dto, int negocioId, int usuarioId)
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var venta = await _context.Ventas.Include(v => v.Cliente).Include(v => v.Pagos)
+                    .FirstOrDefaultAsync(v => v.Id == ventaId && v.NegocioId == negocioId);
+                if (venta == null) return (false, true, "La venta no existe.", null);
+                if (venta.Estado == "Anulada") return (false, false, "No se pueden registrar abonos en una venta anulada.", null);
+                if (venta.Estado == "Pagada") return (false, false, "Esta venta ya está pagada completamente.", null);
+
+                var totalPagado = venta.Pagos.Sum(p => p.Monto);
+                var pendiente = venta.Total - totalPagado;
+                if (pendiente <= 0) return (false, false, "Esta venta no tiene saldo pendiente.", null);
+                if (dto.Monto > pendiente) return (false, false, $"El abono no puede ser mayor al saldo pendiente de ₡{pendiente:N2}.", null);
+
+                var pago = new Pago
+                {
+                    VentaId = venta.Id, UsuarioId = usuarioId, Monto = dto.Monto, Fecha = FechaHelper.AhoraUtc(),
+                    MetodoPago = string.IsNullOrWhiteSpace(dto.MetodoPago) ? "Efectivo" : dto.MetodoPago.Trim(),
+                    Referencia = string.IsNullOrWhiteSpace(dto.Referencia) ? null : dto.Referencia.Trim(),
+                    Notas = string.IsNullOrWhiteSpace(dto.Notas) ? null : dto.Notas.Trim()
+                };
+                _context.Pagos.Add(pago);
+                _context.MovimientosCuenta.Add(new MovimientoCuenta
+                {
+                    ClienteId = venta.ClienteId, VentaId = venta.Id, UsuarioId = usuarioId,
+                    Tipo = "Abono", Monto = -dto.Monto, Fecha = FechaHelper.AhoraUtc(), Descripcion = $"Abono venta #{venta.Id}"
+                });
+
+                var nuevoTotal = totalPagado + dto.Monto;
+                var nuevoPendiente = venta.Total - nuevoTotal;
+                venta.Estado = nuevoPendiente == 0 ? "Pagada" : "Parcial";
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return (true, false, null, new { mensaje = "Abono registrado correctamente.", venta = new { venta.Id, Cliente = venta.Cliente.Nombre, venta.Total, Abonado = nuevoTotal, Pendiente = nuevoPendiente, venta.Estado }, pago = new { pago.Id, pago.Monto, pago.MetodoPago, pago.Referencia, pago.Fecha } });
+            }
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw;
+            }
+        }
     }
 }
