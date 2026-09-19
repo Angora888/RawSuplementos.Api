@@ -67,6 +67,22 @@ namespace RawSuplementos.Api.Controllers
             });
         }
 
+        [Authorize]
+        [HttpGet("sesion")]
+        public async Task<IActionResult> Sesion()
+        {
+            var negocioId = ObtenerNegocioId();
+            if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
+
+            var negocio = await _context.Negocios.AsNoTracking()
+                .Where(n => n.Id == negocioId.Value)
+                .Select(n => new { n.Id, n.Nombre, n.Slug, n.LogoUrl, n.WhatsApp, n.Activo, n.Bloqueado })
+                .FirstOrDefaultAsync();
+
+            if (negocio == null || !negocio.Activo) return Unauthorized("El negocio está desactivado.");
+            return Ok(new { negocio });
+        }
+
         [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDto dto)
