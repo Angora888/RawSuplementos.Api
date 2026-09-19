@@ -42,7 +42,7 @@ namespace RawSuplementos.Api.Controllers
                 .OrderBy(p => p.Nombre)
                 .Select(p => new { p.Id, p.Nombre, p.Marca, p.Presentacion, p.Sabor, p.PrecioVenta, p.ImageUrl, Categoria = p.Categoria.Nombre, Disponible = p.Stock > 0 })
                 .ToListAsync();
-            return Ok(new { negocio = new { negocio.Nombre, negocio.Slug, negocio.LogoUrl, negocio.WhatsApp, negocio.Telefono, negocio.Direccion, negocio.ColorPrimario, negocio.ColorSecundario, negocio.TituloLanding, negocio.DescripcionLanding, negocio.ColorFondo, negocio.ColorHeader, negocio.ColorFooter, negocio.ColorBoton, negocio.ColorTexto, negocio.HeroFondoUrl, negocio.TextoFooter }, productos });
+            return Ok(new { negocio = new { negocio.Nombre, negocio.Slug, negocio.LogoUrl, negocio.WhatsApp, negocio.Telefono, negocio.Direccion, negocio.ColorPrimario, negocio.ColorSecundario, negocio.TituloLanding, negocio.DescripcionLanding, negocio.ColorFondo, negocio.ColorHeader, negocio.ColorFooter, negocio.ColorBoton, negocio.ColorTexto, negocio.HeroFondoUrl, negocio.TextoFooter, negocio.HeroEstilo, negocio.HeroEtiqueta, negocio.HeroTituloResaltado, negocio.HeroImagenUrl }, productos });
         }
 
         [HttpGet("{id:int}")]
