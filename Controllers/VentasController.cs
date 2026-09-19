@@ -23,6 +23,15 @@ namespace RawSuplementos.Api.Controllers
             _usuarioTenantService = usuarioTenantService;
         }
 
+        private static string? ValidarNuevaVenta(CrearVentaDto dto)
+        {
+            if (dto.Productos == null || !dto.Productos.Any()) return "Debe agregar al menos un producto.";
+            if (dto.Productos.Any(p => p.Cantidad <= 0)) return "Las cantidades de productos deben ser mayores a cero.";
+            if (dto.Descuento < 0) return "El descuento no puede ser negativo.";
+            if (dto.PagoInicial < 0) return "El pago inicial no puede ser negativo.";
+            return null;
+        }
+
         [HttpPost]
         public async Task<IActionResult> CrearVenta(CrearVentaDto dto)
         {
@@ -31,9 +40,8 @@ namespace RawSuplementos.Api.Controllers
             if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
             if (!await _usuarioTenantService.EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
 
-            if (dto.Productos == null || !dto.Productos.Any()) return BadRequest("Debe agregar al menos un producto.");
-            if (dto.Descuento < 0) return BadRequest("El descuento no puede ser negativo.");
-            if (dto.PagoInicial < 0) return BadRequest("El pago inicial no puede ser negativo.");
+            var errorValidacion = ValidarNuevaVenta(dto);
+            if (errorValidacion != null) return BadRequest(errorValidacion);
 
             await using var transaction = await _context.Database.BeginTransactionAsync();
             try
@@ -43,8 +51,6 @@ namespace RawSuplementos.Api.Controllers
 
                 var solicitados = dto.Productos.GroupBy(p => p.ProductoId)
                     .Select(g => new { ProductoId = g.Key, Cantidad = g.Sum(x => x.Cantidad) }).ToList();
-                if (solicitados.Any(x => x.Cantidad <= 0)) return BadRequest("Las cantidades de productos deben ser mayores a cero.");
-
                 var ids = solicitados.Select(x => x.ProductoId).ToList();
                 var productos = await _context.Productos
                     .Where(p => ids.Contains(p.Id) && p.NegocioId == negocioId.Value && p.Activo)
