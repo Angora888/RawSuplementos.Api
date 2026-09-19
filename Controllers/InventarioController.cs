@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -21,24 +20,18 @@ namespace RawSuplementos.Api.Controllers
             _context = context;
         }
 
-        private int? ObtenerNegocioId()
-        {
-            var claim = User.FindFirst("negocioId")?.Value;
-            return int.TryParse(claim, out var negocioId) ? negocioId : null;
-        }
 
         [HttpPost("ajustar/{productoId:int}")]
         public async Task<IActionResult> AjustarInventario(int productoId, AjustarInventarioDto dto)
         {
-            var negocioId = ObtenerNegocioId();
+            var negocioId = User.ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
 
-            var usuarioIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(usuarioIdClaim, out int usuarioId))
-                return Unauthorized("No se pudo identificar al usuario.");
+            var usuarioId = User.ObtenerUsuarioId();
+            if (usuarioId == null) return Unauthorized("No se pudo identificar al usuario.");
 
             var usuarioValido = await _context.Usuarios.AsNoTracking()
-                .AnyAsync(u => u.Id == usuarioId && u.NegocioId == negocioId.Value && u.Activo);
+                .AnyAsync(u => u.Id == usuarioId.Value && u.NegocioId == negocioId.Value && u.Activo);
             if (!usuarioValido) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
 
             if (dto.Cantidad == 0) return BadRequest("La cantidad no puede ser cero.");
@@ -60,7 +53,7 @@ namespace RawSuplementos.Api.Controllers
             var movimiento = new MovimientoInventario
             {
                 ProductoId = producto.Id,
-                UsuarioId = usuarioId,
+                UsuarioId = usuarioId.Value,
                 Tipo = dto.Tipo,
                 Cantidad = dto.Cantidad,
                 StockAnterior = stockAnterior,
@@ -83,7 +76,7 @@ namespace RawSuplementos.Api.Controllers
         [HttpGet("producto/{productoId:int}")]
         public async Task<IActionResult> ObtenerMovimientosProducto(int productoId)
         {
-            var negocioId = ObtenerNegocioId();
+            var negocioId = User.ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
 
             var producto = await _context.Productos.AsNoTracking()
