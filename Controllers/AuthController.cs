@@ -122,7 +122,8 @@ namespace RawSuplementos.Api.Controllers
                         usuario.Negocio.Nombre,
                         usuario.Negocio.Slug,
                         usuario.Negocio.LogoUrl,
-                        usuario.Negocio.WhatsApp
+                        usuario.Negocio.WhatsApp,
+                        usuario.Negocio.Bloqueado
                     }
                 }
             });
