@@ -16,11 +16,13 @@ namespace RawSuplementos.Api.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly UsuarioTenantService _usuarioTenantService;
+        private readonly VentaService _ventaService;
 
-        public VentasController(ApplicationDbContext context, UsuarioTenantService usuarioTenantService)
+        public VentasController(ApplicationDbContext context, UsuarioTenantService usuarioTenantService, VentaService ventaService)
         {
             _context = context;
             _usuarioTenantService = usuarioTenantService;
+            _ventaService = ventaService;
         }
 
         private static string? ValidarNuevaVenta(CrearVentaDto dto)
@@ -43,105 +45,13 @@ namespace RawSuplementos.Api.Controllers
             var errorValidacion = ValidarNuevaVenta(dto);
             if (errorValidacion != null) return BadRequest(errorValidacion);
 
-            await using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Id == dto.ClienteId && c.NegocioId == negocioId.Value && c.Activo);
-                if (cliente == null) return BadRequest("El cliente no existe, está inactivo o no pertenece al negocio.");
-
-                var solicitados = dto.Productos.GroupBy(p => p.ProductoId)
-                    .Select(g => new { ProductoId = g.Key, Cantidad = g.Sum(x => x.Cantidad) }).ToList();
-                var ids = solicitados.Select(x => x.ProductoId).ToList();
-                var productos = await _context.Productos
-                    .Where(p => ids.Contains(p.Id) && p.NegocioId == negocioId.Value && p.Activo)
-                    .ToListAsync();
-                if (productos.Count != ids.Count) return BadRequest("Uno o más productos no existen, están inactivos o no pertenecen al negocio.");
-
-                decimal subtotal = 0;
-                foreach (var item in solicitados)
-                {
-                    var producto = productos.First(p => p.Id == item.ProductoId);
-                    if (producto.Stock < item.Cantidad) return BadRequest($"Stock insuficiente para {producto.Nombre}. Disponible: {producto.Stock}.");
-                    subtotal += producto.PrecioVenta * item.Cantidad;
-                }
-
-                if (dto.Descuento > subtotal) return BadRequest("El descuento no puede ser mayor al subtotal.");
-                var total = subtotal - dto.Descuento;
-                if (dto.PagoInicial > total) return BadRequest("El pago inicial no puede ser mayor al total.");
-
-                DateTime? fechaVencimiento = null;
-                if (dto.PagoInicial < total)
-                {
-                    if (!dto.FechaVencimiento.HasValue) return BadRequest("Debe indicar una fecha de vencimiento cuando queda saldo pendiente.");
-                    var fecha = dto.FechaVencimiento.Value.Date;
-                    if (fecha < FechaHelper.HoyCostaRica()) return BadRequest("La fecha de vencimiento no puede ser anterior a hoy.");
-                    fechaVencimiento = FechaHelper.CostaRicaAUtc(fecha);
-                }
-
-                var estado = dto.PagoInicial == 0 ? "Pendiente" : dto.PagoInicial < total ? "Parcial" : "Pagada";
-                var venta = new Venta
-                {
-                    NegocioId = negocioId.Value,
-                    ClienteId = cliente.Id,
-                    UsuarioId = usuarioId.Value,
-                    Fecha = FechaHelper.AhoraUtc(),
-                    FechaVencimiento = fechaVencimiento,
-                    Subtotal = subtotal,
-                    Descuento = dto.Descuento,
-                    Total = total,
-                    Estado = estado,
-                    Notas = string.IsNullOrWhiteSpace(dto.Notas) ? null : dto.Notas.Trim()
-                };
-                _context.Ventas.Add(venta);
-                await _context.SaveChangesAsync();
-
-                foreach (var item in solicitados)
-                {
-                    var producto = productos.First(p => p.Id == item.ProductoId);
-                    _context.VentaDetalles.Add(new VentaDetalle
-                    {
-                        VentaId = venta.Id, ProductoId = producto.Id, Cantidad = item.Cantidad,
-                        PrecioUnitario = producto.PrecioVenta, CostoUnitario = producto.PrecioCompra,
-                        Subtotal = producto.PrecioVenta * item.Cantidad
-                    });
-                    var anterior = producto.Stock;
-                    producto.Stock -= item.Cantidad;
-                    _context.MovimientosInventario.Add(new MovimientoInventario
-                    {
-                        ProductoId = producto.Id, UsuarioId = usuarioId.Value, VentaId = venta.Id,
-                        Tipo = "Venta", Cantidad = -item.Cantidad, StockAnterior = anterior, StockNuevo = producto.Stock,
-                        Fecha = FechaHelper.AhoraUtc(), Motivo = $"Venta #{venta.Id}"
-                    });
-                }
-
-                _context.MovimientosCuenta.Add(new MovimientoCuenta
-                {
-                    ClienteId = cliente.Id, VentaId = venta.Id, UsuarioId = usuarioId.Value,
-                    Tipo = "Venta", Monto = total, Fecha = FechaHelper.AhoraUtc(), Descripcion = $"Venta #{venta.Id}"
-                });
-
-                if (dto.PagoInicial > 0)
-                {
-                    _context.Pagos.Add(new Pago
-                    {
-                        VentaId = venta.Id, UsuarioId = usuarioId.Value, Monto = dto.PagoInicial, Fecha = FechaHelper.AhoraUtc(),
-                        MetodoPago = string.IsNullOrWhiteSpace(dto.MetodoPago) ? "Efectivo" : dto.MetodoPago.Trim(),
-                        Referencia = string.IsNullOrWhiteSpace(dto.ReferenciaPago) ? null : dto.ReferenciaPago.Trim()
-                    });
-                    _context.MovimientosCuenta.Add(new MovimientoCuenta
-                    {
-                        ClienteId = cliente.Id, VentaId = venta.Id, UsuarioId = usuarioId.Value,
-                        Tipo = "Pago", Monto = -dto.PagoInicial, Fecha = FechaHelper.AhoraUtc(), Descripcion = $"Pago inicial venta #{venta.Id}"
-                    });
-                }
-
-                await _context.SaveChangesAsync();
-                await transaction.CommitAsync();
-                return Ok(new { mensaje = "Venta registrada correctamente.", venta = new { venta.Id, Cliente = cliente.Nombre, venta.Subtotal, venta.Descuento, venta.Total, Pagado = dto.PagoInicial, Pendiente = total - dto.PagoInicial, venta.Estado, venta.Fecha } });
+                var resultado = await _ventaService.CrearAsync(dto, negocioId.Value, usuarioId.Value);
+                return resultado.Ok ? Ok(resultado.Data) : BadRequest(resultado.Error);
             }
             catch (Exception)
             {
-                await transaction.RollbackAsync();
                 return StatusCode(500, "Ocurrió un error al registrar la venta.");
             }
         }
