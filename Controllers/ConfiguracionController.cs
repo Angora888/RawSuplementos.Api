@@ -38,7 +38,8 @@ namespace RawSuplementos.Api.Controllers
                     n.LogoUrl,
                     n.WhatsApp,
                     n.ColorPrimario,
-                    n.ColorSecundario
+                    n.ColorSecundario,
+                    n.ColorFondo, n.ColorHeader, n.ColorFooter, n.ColorBoton, n.ColorTexto, n.HeroFondoUrl, n.TextoFooter
                 })
                 .FirstOrDefaultAsync();
 
@@ -60,6 +61,13 @@ namespace RawSuplementos.Api.Controllers
             negocio.WhatsApp = Limpiar(dto.WhatsApp);
             negocio.ColorPrimario = NormalizarColor(dto.ColorPrimario, "#5267df");
             negocio.ColorSecundario = NormalizarColor(dto.ColorSecundario, "#172033");
+            negocio.ColorFondo = NormalizarColor(dto.ColorFondo, "#f7f9fc");
+            negocio.ColorHeader = NormalizarColor(dto.ColorHeader, "#ffffff");
+            negocio.ColorFooter = NormalizarColor(dto.ColorFooter, "#f7f9fc");
+            negocio.ColorBoton = NormalizarColor(dto.ColorBoton, negocio.ColorPrimario ?? "#5267df");
+            negocio.ColorTexto = NormalizarColor(dto.ColorTexto, "#172033");
+            negocio.HeroFondoUrl = Limpiar(dto.HeroFondoUrl);
+            negocio.TextoFooter = Limpiar(dto.TextoFooter);
 
             await _context.SaveChangesAsync();
 
@@ -75,7 +83,8 @@ namespace RawSuplementos.Api.Controllers
                     negocio.LogoUrl,
                     negocio.WhatsApp,
                     negocio.ColorPrimario,
-                    negocio.ColorSecundario
+                    negocio.ColorSecundario,
+                    negocio.ColorFondo, negocio.ColorHeader, negocio.ColorFooter, negocio.ColorBoton, negocio.ColorTexto, negocio.HeroFondoUrl, negocio.TextoFooter
                 }
             });
         }
