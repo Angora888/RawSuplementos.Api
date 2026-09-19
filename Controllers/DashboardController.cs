@@ -18,16 +18,11 @@ namespace RawSuplementos.Api.Controllers
             _context = context;
         }
 
-        private int? ObtenerNegocioId()
-        {
-            var claim = User.FindFirst("negocioId")?.Value;
-            return int.TryParse(claim, out var negocioId) ? negocioId : null;
-        }
 
         [HttpGet]
         public async Task<IActionResult> ObtenerDashboard()
         {
-            var negocioId = ObtenerNegocioId();
+            var negocioId = User.ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
 
             var hoyCostaRica = FechaHelper.HoyCostaRica();
