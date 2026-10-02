@@ -33,6 +33,9 @@ namespace RawSuplementos.Api.Migrations
                     b.Property<bool>("Activa")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("NegocioId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -40,7 +43,7 @@ namespace RawSuplementos.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Nombre");
+                    b.HasIndex("NegocioId", "Nombre");
 
                     b.ToTable("Categorias");
                 });
@@ -63,6 +66,9 @@ namespace RawSuplementos.Api.Migrations
                     b.Property<DateTime>("FechaCreacion")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("NegocioId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -79,7 +85,7 @@ namespace RawSuplementos.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Telefono");
+                    b.HasIndex("NegocioId", "Telefono");
 
                     b.ToTable("Clientes");
                 });
@@ -173,6 +179,117 @@ namespace RawSuplementos.Api.Migrations
                     b.ToTable("MovimientosInventario");
                 });
 
+            modelBuilder.Entity("RawSuplementos.Api.Models.Negocio", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("Bloqueado")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ColorBoton")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ColorFondo")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ColorFooter")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ColorHeader")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ColorPrimario")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ColorSecundario")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("ColorTexto")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("DescripcionLanding")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Direccion")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("HeroEstilo")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("HeroEtiqueta")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("HeroFondoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("HeroImagenUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("HeroTituloResaltado")
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)");
+
+                    b.Property<string>("LogoUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<string>("Telefono")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TextoFooter")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)");
+
+                    b.Property<string>("TituloLanding")
+                        .HasMaxLength(180)
+                        .HasColumnType("character varying(180)");
+
+                    b.Property<string>("WhatsApp")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("Negocios");
+                });
+
             modelBuilder.Entity("RawSuplementos.Api.Models.Pago", b =>
                 {
                     b.Property<int>("Id")
@@ -234,6 +351,9 @@ namespace RawSuplementos.Api.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int>("NegocioId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -265,6 +385,8 @@ namespace RawSuplementos.Api.Migrations
 
                     b.HasIndex("CategoriaId");
 
+                    b.HasIndex("NegocioId");
+
                     b.ToTable("Productos");
                 });
 
@@ -287,6 +409,9 @@ namespace RawSuplementos.Api.Migrations
                     b.Property<DateTime>("FechaCreacion")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("NegocioId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasMaxLength(120)
@@ -305,6 +430,8 @@ namespace RawSuplementos.Api.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("NegocioId");
 
                     b.ToTable("Usuarios");
                 });
@@ -334,6 +461,9 @@ namespace RawSuplementos.Api.Migrations
                     b.Property<DateTime?>("FechaVencimiento")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("NegocioId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Notas")
                         .HasColumnType("text");
 
@@ -351,6 +481,8 @@ namespace RawSuplementos.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClienteId");
+
+                    b.HasIndex("NegocioId");
 
                     b.HasIndex("UsuarioId");
 
@@ -392,6 +524,28 @@ namespace RawSuplementos.Api.Migrations
                     b.HasIndex("VentaId");
 
                     b.ToTable("VentaDetalles");
+                });
+
+            modelBuilder.Entity("RawSuplementos.Api.Models.Categoria", b =>
+                {
+                    b.HasOne("RawSuplementos.Api.Models.Negocio", "Negocio")
+                        .WithMany("Categorias")
+                        .HasForeignKey("NegocioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Negocio");
+                });
+
+            modelBuilder.Entity("RawSuplementos.Api.Models.Cliente", b =>
+                {
+                    b.HasOne("RawSuplementos.Api.Models.Negocio", "Negocio")
+                        .WithMany()
+                        .HasForeignKey("NegocioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Negocio");
                 });
 
             modelBuilder.Entity("RawSuplementos.Api.Models.MovimientoCuenta", b =>
@@ -473,7 +627,26 @@ namespace RawSuplementos.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("RawSuplementos.Api.Models.Negocio", "Negocio")
+                        .WithMany()
+                        .HasForeignKey("NegocioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Categoria");
+
+                    b.Navigation("Negocio");
+                });
+
+            modelBuilder.Entity("RawSuplementos.Api.Models.Usuario", b =>
+                {
+                    b.HasOne("RawSuplementos.Api.Models.Negocio", "Negocio")
+                        .WithMany("Usuarios")
+                        .HasForeignKey("NegocioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Negocio");
                 });
 
             modelBuilder.Entity("RawSuplementos.Api.Models.Venta", b =>
@@ -484,6 +657,12 @@ namespace RawSuplementos.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("RawSuplementos.Api.Models.Negocio", "Negocio")
+                        .WithMany()
+                        .HasForeignKey("NegocioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("RawSuplementos.Api.Models.Usuario", "Usuario")
                         .WithMany("Ventas")
                         .HasForeignKey("UsuarioId")
@@ -491,6 +670,8 @@ namespace RawSuplementos.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Cliente");
+
+                    b.Navigation("Negocio");
 
                     b.Navigation("Usuario");
                 });
@@ -524,6 +705,13 @@ namespace RawSuplementos.Api.Migrations
                     b.Navigation("MovimientosCuenta");
 
                     b.Navigation("Ventas");
+                });
+
+            modelBuilder.Entity("RawSuplementos.Api.Models.Negocio", b =>
+                {
+                    b.Navigation("Categorias");
+
+                    b.Navigation("Usuarios");
                 });
 
             modelBuilder.Entity("RawSuplementos.Api.Models.Producto", b =>
