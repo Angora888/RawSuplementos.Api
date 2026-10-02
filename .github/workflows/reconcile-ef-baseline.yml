@@ -1,0 +1,102 @@
+name: Generate EF reconciliation baseline
+
+on:
+  push:
+    branches:
+      - chore/ef-reconcile-baseline
+    paths:
+      - .github/workflows/reconcile-ef-baseline.yml
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: chore/ef-reconcile-baseline
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install EF CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.11
+
+      - name: Restore
+        run: dotnet restore RawSuplementos.csproj
+
+      - name: Generate migration and snapshot
+        env:
+          ConnectionStrings__DefaultConnection: Host=localhost;Database=dummy;Username=dummy;Password=dummy
+        run: dotnet ef migrations add ReconcileCurrentSchema --project RawSuplementos.csproj --startup-project RawSuplementos.csproj
+
+      - name: Convert generated migration to no-op baseline
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          migrations = Path("Migrations")
+          generated = [
+              p for p in migrations.glob("*_ReconcileCurrentSchema.cs")
+              if not p.name.endswith(".Designer.cs")
+          ]
+          if len(generated) != 1:
+              raise SystemExit(f"Expected one generated migration, found {generated}")
+
+          source = generated[0]
+          source_designer = source.with_name(source.stem + ".Designer.cs")
+          target = migrations / "20261002103000_ReconcileCurrentSchema.cs"
+          target_designer = migrations / "20261002103000_ReconcileCurrentSchema.Designer.cs"
+
+          designer_text = source_designer.read_text(encoding="utf-8-sig")
+          old_id = source.stem
+          designer_text = designer_text.replace(old_id, "20261002103000_ReconcileCurrentSchema")
+
+          migration_text = """using Microsoft.EntityFrameworkCore.Migrations;
+
+          #nullable disable
+
+          namespace RawSuplementos.Api.Migrations
+          {
+              public partial class ReconcileCurrentSchema : Migration
+              {
+                  protected override void Up(MigrationBuilder migrationBuilder)
+                  {
+                  }
+
+                  protected override void Down(MigrationBuilder migrationBuilder)
+                  {
+                  }
+              }
+          }
+          """
+
+          target.write_text(migration_text, encoding="utf-8")
+          target_designer.write_text(designer_text, encoding="utf-8")
+
+          source.unlink()
+          source_designer.unlink()
+          PY
+
+      - name: Verify generated files
+        run: |
+          test -f Migrations/20261002103000_ReconcileCurrentSchema.cs
+          test -f Migrations/20261002103000_ReconcileCurrentSchema.Designer.cs
+          grep -q 'RawSuplementos.Api.Models.Negocio' Migrations/ApplicationDbContextModelSnapshot.cs
+          grep -q '20261002103000_ReconcileCurrentSchema' Migrations/20261002103000_ReconcileCurrentSchema.Designer.cs
+          dotnet build RawSuplementos.csproj --configuration Release --no-restore
+
+      - name: Commit generated baseline
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Migrations
+          git commit -m "Reconcile EF migration snapshot with current schema"
+          git push
