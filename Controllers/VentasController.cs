@@ -13,7 +13,7 @@ namespace RawSuplementos.Api.Controllers
     {
         private readonly UsuarioTenantService _usuarioTenantService;
         private readonly VentaService _ventaService;
-        private readonly VentaConsultaService _ventaConsultaService;
+        private readonly VentaConsultaService _ventaConsultaService;\n        private readonly ILogger<VentasController> _logger;
 
         public VentasController(UsuarioTenantService usuarioTenantService, VentaService ventaService, VentaConsultaService ventaConsultaService)
         {
