@@ -39,7 +39,7 @@ namespace RawSuplementos.Api.Controllers
             }
 
             var usuarioActivo = await _usuarioTenantService
-                .EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId);
+                .EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId.Value);
 
             return usuarioActivo
                 ? (negocioId, usuarioId)
@@ -112,7 +112,7 @@ namespace RawSuplementos.Api.Controllers
         {
             var negocioId = User.ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
-            var venta = await _ventaConsultaService.ObtenerVentaAsync(id, negocioId);
+            var venta = await _ventaConsultaService.ObtenerVentaAsync(id, negocioId.Value);
             return venta == null ? NotFound("Venta no encontrada.") : Ok(venta);
         }
 
