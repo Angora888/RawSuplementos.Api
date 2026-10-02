@@ -13,13 +13,19 @@ namespace RawSuplementos.Api.Controllers
     {
         private readonly UsuarioTenantService _usuarioTenantService;
         private readonly VentaService _ventaService;
-        private readonly VentaConsultaService _ventaConsultaService;\n        private readonly ILogger<VentasController> _logger;
+        private readonly VentaConsultaService _ventaConsultaService;
+        private readonly ILogger<VentasController> _logger;
 
-        public VentasController(UsuarioTenantService usuarioTenantService, VentaService ventaService, VentaConsultaService ventaConsultaService)
+        public VentasController(
+            UsuarioTenantService usuarioTenantService,
+            VentaService ventaService,
+            VentaConsultaService ventaConsultaService,
+            ILogger<VentasController> logger)
         {
             _usuarioTenantService = usuarioTenantService;
             _ventaService = ventaService;
             _ventaConsultaService = ventaConsultaService;
+            _logger = logger;
         }
 
         private static string? ValidarNuevaVenta(CrearVentaDto dto)
@@ -47,8 +53,9 @@ namespace RawSuplementos.Api.Controllers
                 var resultado = await _ventaService.CrearAsync(dto, negocioId.Value, usuarioId.Value);
                 return resultado.Ok ? Ok(resultado.Data) : BadRequest(resultado.Error);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al registrar una venta para el negocio {NegocioId}.", negocioId.Value);
                 return StatusCode(500, "Ocurrió un error al registrar la venta.");
             }
         }
@@ -67,8 +74,9 @@ namespace RawSuplementos.Api.Controllers
                 if (resultado.NotFound) return NotFound(resultado.Error);
                 return resultado.Ok ? Ok(resultado.Data) : BadRequest(resultado.Error);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al anular la venta {VentaId} para el negocio {NegocioId}.", ventaId, negocioId.Value);
                 return StatusCode(500, "Ocurrió un error al anular la venta.");
             }
         }
@@ -105,8 +113,9 @@ namespace RawSuplementos.Api.Controllers
                 if (resultado.NotFound) return NotFound(resultado.Error);
                 return resultado.Ok ? Ok(resultado.Data) : BadRequest(resultado.Error);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Error al registrar un abono para la venta {VentaId} del negocio {NegocioId}.", ventaId, negocioId.Value);
                 return StatusCode(500, "Ocurrió un error al registrar el abono.");
             }
         }
