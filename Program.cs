@@ -24,8 +24,6 @@ builder.Services.AddScoped<VentaConsultaService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddOpenApi();
-
 
 // =========================
 // POSTGRESQL
@@ -123,6 +121,12 @@ builder.Services.AddAuthorization();
 // CORS
 // =========================
 
+var allowedOrigins =
+    builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>()
+    ?? Array.Empty<string>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(
@@ -130,11 +134,7 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy
-                .WithOrigins(
-                    "http://localhost:5173",
-                    "https://raw-suplementos.vercel.app",
-                    "https://miemprendimiento.vercel.app"
-                )
+                .WithOrigins(allowedOrigins)
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         });
@@ -154,8 +154,6 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-
     app.UseSwagger();
 
     app.UseSwaggerUI(options =>
