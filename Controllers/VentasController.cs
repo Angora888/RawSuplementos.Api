@@ -28,6 +28,24 @@ namespace RawSuplementos.Api.Controllers
             _logger = logger;
         }
 
+        private async Task<(int NegocioId, int UsuarioId)?> ObtenerTenantActivoAsync()
+        {
+            var negocioId = User.ObtenerNegocioId();
+            var usuarioId = User.ObtenerUsuarioId();
+
+            if (negocioId == null || usuarioId == null)
+            {
+                return null;
+            }
+
+            var usuarioActivo = await _usuarioTenantService
+                .EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId);
+
+            return usuarioActivo
+                ? (negocioId, usuarioId)
+                : null;
+        }
+
         private static string? ValidarNuevaVenta(CrearVentaDto dto)
         {
             if (dto.Productos == null || !dto.Productos.Any()) return "Debe agregar al menos un producto.";
@@ -40,22 +58,22 @@ namespace RawSuplementos.Api.Controllers
         [HttpPost]
         public async Task<IActionResult> CrearVenta(CrearVentaDto dto)
         {
-            var negocioId = User.ObtenerNegocioId();
-            var usuarioId = User.ObtenerUsuarioId();
-            if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
-            if (!await _usuarioTenantService.EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
+            var tenant = await ObtenerTenantActivoAsync();
+            if (tenant == null) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
+
+            var (negocioId, usuarioId) = tenant.Value;
 
             var errorValidacion = ValidarNuevaVenta(dto);
             if (errorValidacion != null) return BadRequest(errorValidacion);
 
             try
             {
-                var resultado = await _ventaService.CrearAsync(dto, negocioId.Value, usuarioId.Value);
+                var resultado = await _ventaService.CrearAsync(dto, negocioId, usuarioId);
                 return resultado.Ok ? Ok(resultado.Data) : BadRequest(resultado.Error);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al registrar una venta para el negocio {NegocioId}.", negocioId.Value);
+                _logger.LogError(ex, "Error al registrar una venta para el negocio {NegocioId}.", negocioId);
                 return StatusCode(500, "Ocurrió un error al registrar la venta.");
             }
         }
@@ -63,20 +81,20 @@ namespace RawSuplementos.Api.Controllers
         [HttpPost("{ventaId:int}/anular")]
         public async Task<IActionResult> AnularVenta(int ventaId, AnularVentaDto dto)
         {
-            var negocioId = User.ObtenerNegocioId();
-            var usuarioId = User.ObtenerUsuarioId();
-            if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
-            if (!await _usuarioTenantService.EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
+            var tenant = await ObtenerTenantActivoAsync();
+            if (tenant == null) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
+
+            var (negocioId, usuarioId) = tenant.Value;
 
             try
             {
-                var resultado = await _ventaService.AnularAsync(ventaId, dto, negocioId.Value, usuarioId.Value);
+                var resultado = await _ventaService.AnularAsync(ventaId, dto, negocioId, usuarioId);
                 if (resultado.NotFound) return NotFound(resultado.Error);
                 return resultado.Ok ? Ok(resultado.Data) : BadRequest(resultado.Error);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al anular la venta {VentaId} para el negocio {NegocioId}.", ventaId, negocioId.Value);
+                _logger.LogError(ex, "Error al anular la venta {VentaId} para el negocio {NegocioId}.", ventaId, negocioId);
                 return StatusCode(500, "Ocurrió un error al anular la venta.");
             }
         }
@@ -94,28 +112,28 @@ namespace RawSuplementos.Api.Controllers
         {
             var negocioId = User.ObtenerNegocioId();
             if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
-            var venta = await _ventaConsultaService.ObtenerVentaAsync(id, negocioId.Value);
+            var venta = await _ventaConsultaService.ObtenerVentaAsync(id, negocioId);
             return venta == null ? NotFound("Venta no encontrada.") : Ok(venta);
         }
 
         [HttpPost("{ventaId:int}/abonos")]
         public async Task<IActionResult> RegistrarAbono(int ventaId, RegistrarAbonoDto dto)
         {
-            var negocioId = User.ObtenerNegocioId();
-            var usuarioId = User.ObtenerUsuarioId();
-            if (negocioId == null || usuarioId == null) return Unauthorized("No se pudo identificar el negocio o usuario.");
-            if (!await _usuarioTenantService.EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId.Value)) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
+            var tenant = await ObtenerTenantActivoAsync();
+            if (tenant == null) return Unauthorized("El usuario no pertenece al negocio o está desactivado.");
+
+            var (negocioId, usuarioId) = tenant.Value;
             if (dto.Monto <= 0) return BadRequest("El monto del abono debe ser mayor a cero.");
 
             try
             {
-                var resultado = await _ventaService.RegistrarAbonoAsync(ventaId, dto, negocioId.Value, usuarioId.Value);
+                var resultado = await _ventaService.RegistrarAbonoAsync(ventaId, dto, negocioId, usuarioId);
                 if (resultado.NotFound) return NotFound(resultado.Error);
                 return resultado.Ok ? Ok(resultado.Data) : BadRequest(resultado.Error);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error al registrar un abono para la venta {VentaId} del negocio {NegocioId}.", ventaId, negocioId.Value);
+                _logger.LogError(ex, "Error al registrar un abono para la venta {VentaId} del negocio {NegocioId}.", ventaId, negocioId);
                 return StatusCode(500, "Ocurrió un error al registrar el abono.");
             }
         }
