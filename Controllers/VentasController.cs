@@ -42,7 +42,7 @@ namespace RawSuplementos.Api.Controllers
                 .EsUsuarioActivoDelNegocioAsync(usuarioId.Value, negocioId.Value);
 
             return usuarioActivo
-                ? (negocioId, usuarioId)
+                ? (negocioId.Value, usuarioId.Value)
                 : null;
         }
 
