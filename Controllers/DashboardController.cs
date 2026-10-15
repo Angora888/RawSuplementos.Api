@@ -47,13 +47,13 @@ namespace RawSuplementos.Api.Controllers
             var cantidadVentasMes = await _context.Ventas.AsNoTracking()
                 .CountAsync(v => v.NegocioId == negocioId.Value && v.Estado != "Anulada" && v.Fecha >= inicioMesUtc && v.Fecha < inicioMesSiguienteUtc);
 
-            var gananciaHoy = await _context.VentaDetalles.AsNoTracking()
-                .Where(d => d.Venta.NegocioId == negocioId.Value && d.Venta.Estado != "Anulada" && d.Venta.Fecha >= inicioHoyUtc && d.Venta.Fecha < inicioMananaUtc)
-                .SumAsync(d => (decimal?)((d.PrecioUnitario - d.CostoUnitario) * d.Cantidad)) ?? 0;
+            var gananciaHoy = await _context.Ventas.AsNoTracking()
+                .Where(v => v.NegocioId == negocioId.Value && v.Estado != "Anulada" && v.Fecha >= inicioHoyUtc && v.Fecha < inicioMananaUtc)
+                .SumAsync(v => (decimal?)(v.Detalles.Sum(d => (d.PrecioUnitario - d.CostoUnitario) * d.Cantidad) - v.Descuento)) ?? 0;
 
-            var gananciaMes = await _context.VentaDetalles.AsNoTracking()
-                .Where(d => d.Venta.NegocioId == negocioId.Value && d.Venta.Estado != "Anulada" && d.Venta.Fecha >= inicioMesUtc && d.Venta.Fecha < inicioMesSiguienteUtc)
-                .SumAsync(d => (decimal?)((d.PrecioUnitario - d.CostoUnitario) * d.Cantidad)) ?? 0;
+            var gananciaMes = await _context.Ventas.AsNoTracking()
+                .Where(v => v.NegocioId == negocioId.Value && v.Estado != "Anulada" && v.Fecha >= inicioMesUtc && v.Fecha < inicioMesSiguienteUtc)
+                .SumAsync(v => (decimal?)(v.Detalles.Sum(d => (d.PrecioUnitario - d.CostoUnitario) * d.Cantidad) - v.Descuento)) ?? 0;
 
             var pagosHoy = await _context.Pagos.AsNoTracking()
                 .Where(p => p.Venta.NegocioId == negocioId.Value && p.Fecha >= inicioHoyUtc && p.Fecha < inicioMananaUtc)
