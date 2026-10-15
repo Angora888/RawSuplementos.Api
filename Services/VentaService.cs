@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using RawSuplementos.Api.Data;
 using RawSuplementos.Api.DTOs;
@@ -14,7 +15,7 @@ namespace RawSuplementos.Api.Services
 
         public async Task<(bool Ok, string? Error, object? Data)> CrearAsync(CrearVentaDto dto, int negocioId, int usuarioId)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             try
             {
                 var cliente = await _context.Clientes.FirstOrDefaultAsync(c => c.Id == dto.ClienteId && c.NegocioId == negocioId && c.Activo);
@@ -86,7 +87,7 @@ namespace RawSuplementos.Api.Services
 
         public async Task<(bool Ok, bool NotFound, string? Error, object? Data)> AnularAsync(int ventaId, AnularVentaDto dto, int negocioId, int usuarioId)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             try
             {
                 var venta = await _context.Ventas.Include(v => v.Cliente).Include(v => v.Detalles).ThenInclude(d => d.Producto).Include(v => v.Pagos)
@@ -134,7 +135,7 @@ namespace RawSuplementos.Api.Services
 
         public async Task<(bool Ok, bool NotFound, string? Error, object? Data)> RegistrarAbonoAsync(int ventaId, RegistrarAbonoDto dto, int negocioId, int usuarioId)
         {
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             try
             {
                 var venta = await _context.Ventas.Include(v => v.Cliente).Include(v => v.Pagos)
