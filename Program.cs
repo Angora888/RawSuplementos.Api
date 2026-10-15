@@ -179,6 +179,8 @@ app.UseCors("Frontend");
 
 app.UseAuthentication();
 
+app.UseMiddleware<RawSuplementos.Api.Middleware.TenantAccessMiddleware>();
+
 app.UseAuthorization();
 
 app.MapControllers();
