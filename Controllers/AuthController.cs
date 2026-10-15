@@ -72,7 +72,14 @@ namespace RawSuplementos.Api.Controllers
         public async Task<IActionResult> Sesion()
         {
             var negocioId = ObtenerNegocioId();
-            if (negocioId == null) return Unauthorized("El token no contiene un negocio válido.");
+            var usuarioId = User.ObtenerUsuarioId();
+            if (negocioId == null || usuarioId == null)
+                return Unauthorized("El token no contiene un usuario y negocio válidos.");
+
+            var usuarioActivo = await _context.Usuarios.AsNoTracking()
+                .AnyAsync(u => u.Id == usuarioId.Value && u.NegocioId == negocioId.Value && u.Activo);
+            if (!usuarioActivo)
+                return Unauthorized("El usuario está desactivado o ya no pertenece al negocio.");
 
             var negocio = await _context.Negocios.AsNoTracking()
                 .Where(n => n.Id == negocioId.Value)
