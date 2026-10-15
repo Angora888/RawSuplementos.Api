@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -44,6 +45,8 @@ namespace RawSuplementos.Api.Controllers
             if (dto.Tipo == "Perdida" && dto.Cantidad > 0)
                 return BadRequest("Las pérdidas deben tener una cantidad negativa.");
 
+            await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+
             var producto = await _context.Productos
                 .FirstOrDefaultAsync(p => p.Id == productoId && p.NegocioId == negocioId.Value && p.Activo);
             if (producto == null) return NotFound("Producto no encontrado.");
@@ -69,6 +72,7 @@ namespace RawSuplementos.Api.Controllers
 
             _context.MovimientosInventario.Add(movimiento);
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
 
             return Ok(new
             {
