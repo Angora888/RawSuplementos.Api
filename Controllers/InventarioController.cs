@@ -39,6 +39,11 @@ namespace RawSuplementos.Api.Controllers
             var tiposPermitidos = new[] { "Entrada", "Ajuste", "Devolucion", "Perdida", "Correccion" };
             if (!tiposPermitidos.Contains(dto.Tipo)) return BadRequest("Tipo de movimiento inválido.");
 
+            if ((dto.Tipo == "Entrada" || dto.Tipo == "Devolucion") && dto.Cantidad < 0)
+                return BadRequest("Las entradas y devoluciones deben tener una cantidad positiva.");
+            if (dto.Tipo == "Perdida" && dto.Cantidad > 0)
+                return BadRequest("Las pérdidas deben tener una cantidad negativa.");
+
             var producto = await _context.Productos
                 .FirstOrDefaultAsync(p => p.Id == productoId && p.NegocioId == negocioId.Value && p.Activo);
             if (producto == null) return NotFound("Producto no encontrado.");
