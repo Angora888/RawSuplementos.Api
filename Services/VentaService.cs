@@ -35,6 +35,7 @@ namespace RawSuplementos.Api.Services
                     subtotal += producto.PrecioVenta * item.Cantidad;
                 }
 
+                if (dto.Descuento < 0) return (false, "El descuento no puede ser negativo.", null);
                 if (dto.Descuento > subtotal) return (false, "El descuento no puede ser mayor al subtotal.", null);
                 var total = subtotal - dto.Descuento;
                 if (dto.PagoInicial > total) return (false, "El pago inicial no puede ser mayor al total.", null);
@@ -52,7 +53,7 @@ namespace RawSuplementos.Api.Services
                 {
                     NegocioId = negocioId, ClienteId = cliente.Id, UsuarioId = usuarioId, Fecha = FechaHelper.AhoraUtc(),
                     FechaVencimiento = fechaVencimiento, Subtotal = subtotal, Descuento = dto.Descuento, Total = total,
-                    Estado = dto.PagoInicial == 0 ? "Pendiente" : dto.PagoInicial < total ? "Parcial" : "Pagada",
+                    Estado = total == 0 || dto.PagoInicial >= total ? "Pagada" : dto.PagoInicial == 0 ? "Pendiente" : "Parcial",
                     Notas = string.IsNullOrWhiteSpace(dto.Notas) ? null : dto.Notas.Trim()
                 };
                 _context.Ventas.Add(venta);
