@@ -15,6 +15,11 @@ namespace RawSuplementos.Api.Services
 
         public async Task<(bool Ok, string? Error, object? Data)> CrearAsync(CrearVentaDto dto, int negocioId, int usuarioId)
         {
+            if (dto.Productos == null || dto.Productos.Count == 0 || dto.Productos.Any(p => p.Cantidad <= 0))
+                return (false, "Debe incluir productos con cantidades mayores que cero.", null);
+            if (dto.PagoInicial < 0)
+                return (false, "El pago inicial no puede ser negativo.", null);
+
             await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             try
             {
