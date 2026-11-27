@@ -141,6 +141,9 @@ namespace RawSuplementos.Api.Services
 
         public async Task<(bool Ok, bool NotFound, string? Error, object? Data)> RegistrarAbonoAsync(int ventaId, RegistrarAbonoDto dto, int negocioId, int usuarioId)
         {
+            if (dto.Monto <= 0)
+                return (false, false, "El monto del abono debe ser mayor que cero.", null);
+
             await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
             try
             {
